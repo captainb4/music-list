@@ -1,0 +1,1780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoxelBeat - Enhanced Visualizer</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;700&display=swap');
+:root{--bg:#0d0f0b;--surface:#141710;--surface2:#1c2018;--border:#2e3328;--accent:#aaff44;--accent2:#ff4466;--accent3:#44aaff;--text:#d4e0b8;--muted:#5a6648}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospace;height:100vh;overflow:hidden}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px);pointer-events:none;z-index:999}
+.layout{display:grid;grid-template-columns:300px 1fr;grid-template-rows:52px 1fr;height:100vh;position:relative;z-index:1}
+header{grid-column:1/-1;border-bottom:2px solid var(--border);background:var(--surface);display:flex;align-items:center;padding:0 20px;gap:16px}
+.header-logo{font-family:'VT323',monospace;font-size:26px;color:var(--accent);letter-spacing:3px;text-shadow:0 0 12px rgba(170,255,68,.5)}
+.header-logo span{color:var(--text)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--accent);animation:blink 1s infinite;vertical-align:middle;margin-left:2px}
+.header-tag{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;border:1px solid var(--border);padding:2px 8px}
+.header-right{margin-left:auto;display:flex;gap:24px;align-items:center}
+.hstat{text-align:right}.hstat-label{font-size:9px;color:var(--muted);letter-spacing:1px;display:block}
+.hstat-val{font-family:'VT323',monospace;font-size:20px;color:var(--accent);line-height:1}
+.sidebar{border-right:2px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
+.sidebar::-webkit-scrollbar{width:4px}.sidebar::-webkit-scrollbar-thumb{background:var(--border)}
+.panel{border-bottom:1px solid var(--border);padding:14px 16px}
+.panel-title{font-family:'VT323',monospace;font-size:16px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.panel-title::before{content:'>';color:var(--muted)}
+.dropzone{border:2px dashed var(--border);padding:16px;text-align:center;cursor:pointer;transition:all .15s;background:var(--surface2);position:relative;border-radius:2px}
+.dropzone:hover,.dropzone.drag-over{border-color:var(--accent);background:rgba(170,255,68,.05)}
+.dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-icon{font-family:'VT323',monospace;font-size:26px;color:var(--muted);display:block}
+.drop-text{font-size:10px;color:var(--muted);line-height:1.5}.drop-text strong{color:var(--accent)}
+.playlist{max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin-top:8px}
+.playlist::-webkit-scrollbar{width:3px}.playlist::-webkit-scrollbar-thumb{background:var(--border)}
+.track-item{display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border:1px solid transparent;border-radius:2px;transition:all .1s;font-size:10px;color:var(--muted)}
+.track-item:hover{border-color:var(--border);color:var(--text);background:var(--surface2)}
+.track-item.active{border-color:var(--accent);background:rgba(170,255,68,.08);color:var(--accent)}
+.track-num{font-family:'VT323',monospace;font-size:14px;min-width:18px;color:var(--muted)}
+.track-item.active .track-num{display:none}
+.track-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.track-dur{color:var(--muted);font-size:9px;min-width:36px;text-align:right}
+.playing-icon{display:none;font-family:'VT323',monospace;font-size:16px;color:var(--accent);animation:blink .6s infinite}
+.track-item.active .playing-icon{display:block}
+.transport{display:flex;flex-direction:column;gap:10px}
+.now-playing{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:14px}
+.now-playing span{color:var(--accent)}
+.progress-wrap{position:relative;height:6px;background:var(--border);cursor:pointer}
+.progress-fill{height:100%;background:var(--accent);width:0%;transition:width .1s linear;box-shadow:0 0 6px rgba(170,255,68,.4)}
+.time-row{display:flex;justify-content:space-between;font-family:'VT323',monospace;font-size:13px;color:var(--muted)}
+.transport-btns{display:flex;gap:4px;align-items:center}
+.tbtn{padding:6px 10px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'VT323',monospace;font-size:18px;cursor:pointer;border-radius:2px;transition:all .1s;line-height:1}
+.tbtn:hover{border-color:var(--accent);color:var(--accent)}.tbtn.active{border-color:var(--accent);background:rgba(170,255,68,.12);color:var(--accent)}.tbtn.play-btn{flex:1;font-size:22px}
+.vol-row{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted)}
+.control{margin-bottom:12px}.ctrl-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.ctrl-label{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+.ctrl-val{font-family:'VT323',monospace;font-size:16px;color:var(--accent)}
+input[type=range]{-webkit-appearance:none;width:100%;height:3px;background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;background:var(--accent);border-radius:0;cursor:pointer;box-shadow:0 0 6px rgba(170,255,68,.5)}
+.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.px-btn{padding:7px 4px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:10px;cursor:pointer;text-align:center;transition:all .1s;border-radius:2px}
+.px-btn:hover{border-color:var(--accent);color:var(--accent)}.px-btn.active{border-color:var(--accent);background:rgba(170,255,68,.1);color:var(--accent)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.toggle{position:relative;width:32px;height:18px}.toggle input{display:none}
+.ttrack{position:absolute;inset:0;background:var(--border);cursor:pointer;transition:background .2s}
+.toggle input:checked+.ttrack{background:var(--accent)}
+.ttrack::after{content:'';position:absolute;width:10px;height:10px;background:var(--bg);top:4px;left:4px;transition:transform .15s}
+.toggle input:checked+.ttrack::after{transform:translateX(14px)}
+.color-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+input[type=color]{-webkit-appearance:none;width:32px;height:22px;border:1px solid var(--border);background:none;cursor:pointer;padding:1px}
+input[type=color]::-webkit-color-swatch-wrapper{padding:0}input[type=color]::-webkit-color-swatch{border:none}
+.canvas-wrap{position:relative;overflow:hidden;background:var(--bg)}
+#canvas{display:block;cursor:grab;position:absolute;inset:0;width:100%;height:100%}
+#canvas:active{cursor:grabbing}
+#three-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none}
+.empty-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;pointer-events:none}
+.empty-icon{font-family:'VT323',monospace;font-size:80px;color:var(--border);line-height:1}
+.empty-msg{font-family:'VT323',monospace;font-size:22px;color:var(--muted);letter-spacing:3px}
+.empty-sub{font-size:10px;color:var(--border);letter-spacing:1px}
+.hud{position:absolute;bottom:20px;left:20px;background:rgba(13,15,11,.88);border:1px solid var(--border);padding:12px 16px;min-width:180px;backdrop-filter:blur(8px)}
+.hud-title{font-family:'VT323',monospace;font-size:13px;color:var(--muted);letter-spacing:2px;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px}
+.hud-row{display:flex;justify-content:space-between;gap:20px;font-size:10px;margin-bottom:3px}
+.hud-key{color:var(--muted)}.hud-v{color:var(--text);font-family:'VT323',monospace;font-size:14px}
+.eq-bars{display:flex;align-items:flex-end;gap:2px;height:24px;margin-top:8px}
+.eq-bar{flex:1;background:var(--accent);min-height:2px;box-shadow:0 0 4px rgba(170,255,68,.3)}
+.hint-bar{position:absolute;top:12px;right:16px;font-size:9px;color:var(--muted);text-align:right;line-height:2;letter-spacing:.5px}
+.scheme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.scheme-btn{height:28px;border:2px solid transparent;border-radius:2px;cursor:pointer;transition:all .1s}
+.scheme-btn.active{border-color:#fff;box-shadow:0 0 8px rgba(255,255,255,.3)}.scheme-btn:hover{transform:scale(1.05)}
+/* ── YouTube ─────────────────────────── */
+.yt-url-row{display:flex;gap:4px;margin-bottom:8px}
+.yt-url-input{flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:10px;padding:5px 8px;outline:none;border-radius:2px}
+.yt-url-input:focus{border-color:var(--accent2)}.yt-url-input::placeholder{color:var(--muted)}
+.yt-add-btn{padding:5px 9px;background:var(--surface2);border:1px solid var(--border);color:var(--accent2);font-family:'VT323',monospace;font-size:15px;cursor:pointer;border-radius:2px;white-space:nowrap;transition:all .1s}
+.yt-add-btn:hover{border-color:var(--accent2);background:rgba(255,68,102,.08)}
+#yt-wrap{background:#000;border:1px solid var(--border);margin-bottom:8px;position:relative;display:none;aspect-ratio:16/9;width:100%}
+#yt-wrap iframe,#yt-wrap>div{position:absolute;inset:0;width:100%;height:100%}
+.yt-empty{font-size:9px;color:var(--muted);text-align:center;padding:6px 0 4px}
+.yt-queue{max-height:130px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+.yt-queue::-webkit-scrollbar{width:3px}.yt-queue::-webkit-scrollbar-thumb{background:var(--border)}
+.yt-del{color:var(--accent2)!important;cursor:pointer;font-size:11px;min-width:12px;text-align:center}
+.mic-btn{width:100%;margin-top:8px;padding:7px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:10px;cursor:pointer;border-radius:2px;text-align:center;transition:all .15s}
+.mic-btn:hover{border-color:var(--accent3);color:var(--accent3)}
+.mic-btn.on{border-color:var(--accent2);background:rgba(255,68,102,.12);color:var(--accent2);animation:blink 1.5s infinite}
+.yt-note{font-size:9px;color:var(--muted);line-height:1.6;margin-top:6px;border-top:1px solid var(--border);padding-top:6px}
+/* ── 3D Model ────────────────────────── */
+.model-dz{border:2px dashed var(--border);padding:14px;text-align:center;cursor:pointer;transition:all .15s;background:var(--surface2);position:relative;border-radius:2px}
+.model-dz:hover,.model-dz.drag-over{border-color:var(--accent3);background:rgba(68,170,255,.05)}
+.model-dz input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.model-info{display:none;font-size:10px;color:var(--accent3);margin-top:6px;padding:5px 8px;background:rgba(68,170,255,.06);border:1px solid rgba(68,170,255,.2);border-radius:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#model-ctrl{display:none;margin-top:10px}
+.model-hud{position:absolute;bottom:20px;right:16px;background:rgba(13,15,11,.88);border:1px solid var(--accent3);padding:8px 14px;font-family:'VT323',monospace;font-size:13px;color:var(--accent3);letter-spacing:1px;display:none;backdrop-filter:blur(8px);line-height:1.7}
+/* ── Library / Account / Playlists (grafted from CRATE.FM) ─────────────── */
+.config-banner{position:fixed;right:12px;background:var(--accent2);color:#1a0505;padding:6px 10px;font-size:9px;line-height:1.4;text-align:left;z-index:2000;max-width:220px;border-radius:3px;box-shadow:0 4px 12px rgba(0,0,0,.4);cursor:pointer}
+.config-banner::after{content:'✕ dismiss';display:block;margin-top:3px;font-size:8px;opacity:.75;letter-spacing:1px}
+.lib-field{margin-bottom:8px}
+.lib-label{font-size:9px;color:var(--muted);letter-spacing:1px;display:block;margin-bottom:4px}
+.lib-input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;outline:none;border-radius:2px}
+.lib-input:focus{border-color:var(--accent)}
+.lib-btn{width:100%;padding:7px 6px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'VT323',monospace;font-size:15px;letter-spacing:1px;cursor:pointer;border-radius:2px;margin-top:4px}
+.lib-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.lib-btn:disabled{opacity:.4;cursor:default}
+.lib-status{font-size:9px;color:var(--muted);margin-top:6px;line-height:1.6}
+.lib-sync{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted);margin-top:4px}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.sync-dot.ok{background:var(--accent)}.sync-dot.err{background:var(--accent2)}
+.sr-item{display:flex;gap:8px;align-items:center;padding:6px;border:1px solid var(--border);border-radius:2px;background:var(--surface2);margin-bottom:6px}
+.sr-item img{width:32px;height:32px;object-fit:cover;border-radius:2px;flex-shrink:0}
+.sr-meta{flex:1;min-width:0}
+.sr-title{font-size:10px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr-sub{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr-add{flex-shrink:0;padding:4px 7px;font-size:9px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;border-radius:2px;font-family:'VT323',monospace;letter-spacing:1px}
+.sr-add:hover{border-color:var(--accent);color:var(--accent)}
+.sr-add:disabled{opacity:.4}
+.lib-album-list,.playlist-list{max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.lib-album-item,.playlist-item{display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border:1px solid transparent;border-radius:2px;font-size:10px;color:var(--muted)}
+.lib-album-item:hover,.playlist-item:hover{border-color:var(--border);color:var(--text);background:var(--surface2)}
+.lib-album-item.active,.playlist-item.active{border-color:var(--accent);background:rgba(170,255,68,.08);color:var(--accent)}
+.lib-album-name,.playlist-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lib-album-count{font-family:'VT323',monospace;font-size:12px;color:var(--muted)}
+.playlist-del{opacity:0;font-size:11px;color:var(--accent2)}
+.playlist-item:hover .playlist-del{opacity:1}
+.empty-note{font-size:10px;color:var(--muted);font-style:italic;padding:2px 0}
+/* modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(3px);display:none;align-items:flex-start;justify-content:center;z-index:1000;padding:40px 16px;overflow-y:auto}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:3px;max-width:600px;width:100%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.modal-close{position:absolute;top:10px;right:10px;z-index:5;width:28px;height:28px;border:1px solid var(--border);background:rgba(0,0,0,.6);color:var(--text);cursor:pointer;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.modal-close:hover{border-color:var(--accent2);color:var(--accent2)}
+.modal-head{display:flex;gap:16px;padding:20px;border-bottom:1px solid var(--border)}
+.modal-art{width:110px;height:110px;border-radius:2px;object-fit:cover;flex-shrink:0;background:var(--surface2)}
+.modal-info{display:flex;flex-direction:column;gap:6px;justify-content:center;min-width:0}
+.modal-title{font-family:'VT323',monospace;font-size:22px;color:var(--accent);letter-spacing:1px;line-height:1.1}
+.modal-artist{font-size:12px;color:var(--text)}
+.modal-tags{display:flex;gap:6px;margin-top:2px;flex-wrap:wrap}
+.tag{font-size:8px;letter-spacing:.5px;color:var(--muted);border:1px solid var(--border);padding:1px 5px;border-radius:2px}
+.modal-actions{display:flex;gap:8px;margin-top:6px}
+.modal-body{padding:14px 20px 20px;max-height:50vh;overflow-y:auto}
+.mtrack-row{display:flex;align-items:center;gap:9px;padding:7px 8px;border:1px solid var(--border);border-radius:2px;background:var(--surface2);margin-bottom:5px}
+.mtrack-row.playing{border-color:var(--accent);background:rgba(170,255,68,.08)}
+.mtrack-num{width:18px;text-align:center;font-family:'VT323',monospace;font-size:13px;color:var(--muted);flex-shrink:0}
+.mtrack-play{width:24px;height:24px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:9px}
+.mtrack-play:hover{border-color:var(--accent);color:var(--accent)}
+.mtrack-play.loading{animation:blink .8s infinite;color:var(--accent3)}
+.mtrack-thumb{width:32px;height:32px;border-radius:2px;object-fit:cover;flex-shrink:0;background:var(--surface)}
+.mtrack-meta{flex:1;min-width:0}
+.mtrack-title{font-size:10px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mtrack-artist{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mtrack-dur{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);flex-shrink:0}
+.mtrack-actions{display:flex;gap:4px;flex-shrink:0;align-items:center}
+.mtrack-select{font-size:9px;padding:3px;background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:2px}
+.mtrack-icon-btn{width:22px;height:22px;border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:2px;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mtrack-icon-btn:hover{border-color:var(--accent2);color:var(--accent2)}
+.lib-source-tag{font-size:8px;padding:1px 5px;border-radius:2px;border:1px solid var(--border);color:var(--muted);letter-spacing:.5px}
+.lib-source-tag.yt{color:var(--accent2);border-color:var(--accent2)}
+.lib-source-tag.prev{color:var(--accent3);border-color:var(--accent3)}
+
+/* ═══════════════════════════════════════════════════════════
+   NEW SHELL LAYOUT — collapsible rail + browse pages + docked
+   player bar + full "Now Playing" visualizer overlay
+   ═══════════════════════════════════════════════════════════ */
+html,body{height:100%}
+.app-shell{display:flex;flex-direction:column;height:100vh}
+header{flex:0 0 auto}
+.rail-toggle-header{background:none;border:1px solid var(--border);color:var(--muted);width:30px;height:30px;border-radius:2px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:13px;flex-shrink:0}
+.rail-toggle-header:hover{border-color:var(--accent);color:var(--accent)}
+.body-row{flex:1 1 auto;display:flex;min-height:0;position:relative}
+
+/* ── Rail ─────────────────────────────── */
+.rail{width:210px;flex:0 0 210px;background:var(--surface);border-right:2px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:flex-basis .16s ease,width .16s ease}
+.rail.collapsed{width:60px;flex-basis:60px}
+.rail-nav{display:flex;flex-direction:column;gap:2px;padding:10px 8px;overflow-y:auto}
+.rail-item{display:flex;align-items:center;gap:12px;padding:10px;border:1px solid transparent;background:none;color:var(--muted);cursor:pointer;border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.5px;white-space:nowrap;text-align:left;width:100%}
+.rail-item:hover{border-color:var(--border);color:var(--text);background:var(--surface2)}
+.rail-item.active{border-color:var(--accent);color:var(--accent);background:rgba(170,255,68,.08)}
+.rail-icon{font-family:'VT323',monospace;font-size:18px;width:20px;text-align:center;flex-shrink:0}
+.rail.collapsed .rail-label{display:none}
+.rail-foot{margin-top:auto;padding:10px;border-top:1px solid var(--border)}
+.rail.collapsed .rail-foot .lib-sync span:last-child{display:none}
+
+/* ── Content / pages ──────────────────── */
+.content{flex:1 1 auto;overflow-y:auto;padding:26px 30px 40px}
+.content::-webkit-scrollbar{width:6px}.content::-webkit-scrollbar-thumb{background:var(--border)}
+.page{display:none}
+.page.active{display:block}
+.page-head{margin-bottom:18px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.page-head h1{font-family:'VT323',monospace;font-size:28px;color:var(--accent);letter-spacing:2px}
+.page-sub{font-size:10px;color:var(--muted);letter-spacing:.5px}
+.search-input{max-width:320px;margin-top:10px}
+.page .panel{border:1px solid var(--border);border-radius:3px;max-width:460px}
+
+/* ── Album grid (Home) ────────────────── */
+.album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:18px;margin-top:6px}
+.album-card{cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:4px;overflow:hidden;transition:all .15s;position:relative}
+.album-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.4)}
+.album-card.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.album-card .ac-art-wrap{position:relative;aspect-ratio:1;background:var(--surface2)}
+.album-card img{width:100%;height:100%;object-fit:cover;display:block}
+.album-card .ac-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(13,15,11,0);transition:background .15s}
+.album-card:hover .ac-play{background:rgba(13,15,11,.4)}
+.album-card .ac-play span{opacity:0;transform:scale(.8);transition:all .15s;width:38px;height:38px;border-radius:50%;background:var(--accent);color:#0d0f0b;display:flex;align-items:center;justify-content:center;font-size:15px}
+.album-card:hover .ac-play span{opacity:1;transform:scale(1)}
+.album-card .ac-title{font-size:11px;color:var(--text);padding:8px 10px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.album-card .ac-artist{font-size:10px;color:var(--muted);padding:2px 10px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── Docked player bar (footer) ───────── */
+.player-bar{flex:0 0 auto;display:flex;align-items:center;gap:20px;background:var(--surface);border-top:2px solid var(--border);padding:9px 20px;z-index:50}
+.pb-now{display:flex;align-items:center;gap:10px;min-width:150px;max-width:260px;flex:1 1 220px}
+.pb-icon{color:var(--accent);font-family:'VT323',monospace;font-size:18px;flex-shrink:0}
+.pb-now .now-playing{height:auto;font-size:10px}
+.pb-center{flex:2 1 480px;display:flex;flex-direction:column;gap:5px;max-width:640px}
+.pb-progress-row{display:flex;align-items:center;gap:8px;font-family:'VT323',monospace;font-size:12px;color:var(--muted)}
+.pb-progress-row .progress-wrap{flex:1}
+.pb-transport{display:flex;justify-content:center}
+.pb-right{display:flex;align-items:center;gap:14px;flex:1 1 220px;justify-content:flex-end}
+.pb-right .vol-row{width:110px}
+.pb-expand{padding:7px 12px;border:1px solid var(--border);background:var(--surface2);color:var(--accent);font-family:'VT323',monospace;font-size:14px;letter-spacing:1px;cursor:pointer;border-radius:2px;white-space:nowrap;flex-shrink:0}
+.pb-expand:hover{border-color:var(--accent)}
+.pb-expand.active{background:rgba(170,255,68,.15)}
+
+/* ── Now Playing overlay (visualizer) ─── */
+.now-playing-overlay{position:absolute;inset:0;background:var(--bg);z-index:40;display:none;flex-direction:column}
+.now-playing-overlay.open{display:flex}
+.np-header{flex:0 0 auto;padding:10px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface)}
+.np-header .np-title{font-family:'VT323',monospace;font-size:15px;color:var(--muted);letter-spacing:2px}
+.np-header button{background:none;border:1px solid var(--border);color:var(--muted);font-family:'VT323',monospace;font-size:14px;padding:6px 12px;cursor:pointer;border-radius:2px}
+.np-header button:hover{border-color:var(--accent2);color:var(--accent2)}
+.np-body{flex:1 1 auto;display:flex;min-height:0}
+.np-body .canvas-wrap{flex:1 1 auto;position:relative}
+.np-settings{width:270px;flex:0 0 270px;border-left:2px solid var(--border);background:var(--surface);overflow-y:auto}
+.np-settings::-webkit-scrollbar{width:4px}.np-settings::-webkit-scrollbar-thumb{background:var(--border)}
+.np-settings-toggle{display:none}
+@media(max-width:900px){
+  .np-settings{position:absolute;right:0;top:0;bottom:0;transform:translateX(100%);transition:transform .18s ease;box-shadow:-8px 0 24px rgba(0,0,0,.5)}
+  .np-settings.open{transform:translateX(0)}
+  .np-settings-toggle{display:block}
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <header>
+    <button class="rail-toggle-header" id="rail-toggle" title="Collapse / expand menu">☰</button>
+    <div class="header-logo">VOXEL<span>BEAT</span><div class="cursor"></div></div>
+    <div class="header-tag">Visualizer + Album Library</div>
+    <div class="header-right">
+      <div class="hstat"><span class="hstat-label">BPM</span><div class="hstat-val" id="h-bpm">—</div></div>
+      <div class="hstat"><span class="hstat-label">Bass</span><div class="hstat-val" id="h-bass">—</div></div>
+      <div class="hstat"><span class="hstat-label">Treble</span><div class="hstat-val" id="h-treble">—</div></div>
+      <div class="hstat"><span class="hstat-label">Tracks</span><div class="hstat-val" id="h-tracks">0</div></div>
+    </div>
+  </header>
+
+  <div class="body-row">
+    <!-- COLLAPSIBLE NAV RAIL -->
+    <nav class="rail" id="rail">
+      <div class="rail-nav">
+        <button class="rail-item active" data-page="home"><span class="rail-icon">⌂</span><span class="rail-label">Home</span></button>
+        <button class="rail-item" data-page="add"><span class="rail-icon">+</span><span class="rail-label">Add Album</span></button>
+        <button class="rail-item" data-page="playlists"><span class="rail-icon">☰</span><span class="rail-label">Playlists</span></button>
+        <button class="rail-item" data-page="local"><span class="rail-icon">♪</span><span class="rail-label">Local Files</span></button>
+        <button class="rail-item" data-page="youtube"><span class="rail-icon">▶</span><span class="rail-label">YouTube</span></button>
+        <button class="rail-item" data-page="account"><span class="rail-icon">◇</span><span class="rail-label">Account</span></button>
+      </div>
+      <div class="rail-foot">
+        <div class="lib-sync"><span class="sync-dot" id="sync-dot"></span><span id="sync-text">—</span></div>
+      </div>
+    </nav>
+
+    <!-- MAIN BROWSE AREA -->
+    <main class="content" id="content">
+
+      <!-- HOME: album grid (YouTube-Music-style browse) -->
+      <section class="page active" id="page-home">
+        <div class="page-head">
+          <h1>Your Library</h1>
+          <span class="page-sub">tap an album to see tracks · tap a track to play + open the visualizer</span>
+        </div>
+        <input type="text" id="lib-search" class="lib-input search-input" placeholder="Filter your albums...">
+        <div class="album-grid" id="home-album-grid"></div>
+      </section>
+
+      <!-- ADD ALBUM -->
+      <section class="page" id="page-add">
+        <div class="page-head"><h1>Add Album</h1><span class="page-sub">search YouTube for full-album playlists — tracklist + art come from the playlist itself</span></div>
+        <div class="panel">
+          <div id="add-album-locked" class="lib-status" style="margin-top:0">sign in (Account tab) to add albums.</div>
+          <div id="add-album-form" style="display:none">
+            <div class="lib-field">
+              <span class="lib-label">SEARCH (ARTIST / ALBUM)</span>
+              <input type="text" id="album-search-input" class="lib-input" placeholder="e.g. Fleetwood Mac Rumours">
+            </div>
+            <button class="lib-btn" id="album-search-btn">SEARCH YOUTUBE</button>
+            <div class="lib-status" id="album-search-status"></div>
+            <div id="album-search-results"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PLAYLISTS -->
+      <section class="page" id="page-playlists">
+        <div class="page-head"><h1>Your Playlists</h1><span class="page-sub">private to your account</span></div>
+        <div class="panel">
+          <div id="playlists-locked" class="lib-status" style="margin-top:0">sign in to create playlists.</div>
+          <div id="playlists-area" style="display:none">
+            <div class="playlist-list" id="playlist-list"></div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <input type="text" id="new-playlist-name" class="lib-input" placeholder="new playlist name...">
+              <button class="lib-btn" id="new-playlist-btn" style="width:auto;padding:7px 10px;margin-top:0">+</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LOCAL FILES -->
+      <section class="page" id="page-local">
+        <div class="page-head"><h1>Local Files</h1><span class="page-sub">plays straight from your device — real audio-reactive visuals</span></div>
+        <div class="panel">
+          <div class="dropzone" id="dropzone">
+            <input type="file" id="file-input" accept="audio/*" multiple>
+            <span class="drop-icon">[♪]</span>
+            <div class="drop-text">Drop <strong>audio files</strong><br>mp3 · wav · ogg · flac · m4a</div>
+          </div>
+          <div class="playlist" id="playlist" style="max-height:none"></div>
+        </div>
+      </section>
+
+      <!-- YOUTUBE -->
+      <section class="page" id="page-youtube">
+        <div class="page-head"><h1 style="color:var(--accent2)">YouTube</h1><span class="page-sub">full songs — visuals run on a simulated rhythm during playback</span></div>
+        <div class="panel">
+          <div class="yt-url-row">
+            <input class="yt-url-input" id="yt-input" placeholder="Paste video or playlist URL…">
+            <button class="yt-add-btn" id="yt-add-btn">ADD</button>
+          </div>
+          <div id="yt-wrap"><div id="yt-player"></div></div>
+          <div class="yt-empty" id="yt-empty">Paste a YouTube URL or playlist link above</div>
+          <div class="yt-queue" id="yt-queue" style="max-height:none"></div>
+          <button class="mic-btn" id="mic-btn">🎤 Enable Mic / System Audio Input</button>
+          <div class="yt-note">YouTube audio can't be read by browser APIs, so the grid runs on a simulated rhythm during YouTube playback (BPM/EQ shown with a "~"). For a real audio-reactive grid: enable mic and route system audio to it (e.g. a virtual audio cable).</div>
+        </div>
+      </section>
+
+      <!-- ACCOUNT -->
+      <section class="page" id="page-account">
+        <div class="page-head"><h1>Account</h1><span class="page-sub">albums you add are shared with everyone · playlists are private</span></div>
+        <div class="panel">
+          <div id="account-logged-out">
+            <div class="lib-field">
+              <span class="lib-label">USERNAME</span>
+              <input type="text" id="account-username" class="lib-input" placeholder="letters, numbers, underscores" autocomplete="username">
+            </div>
+            <div class="lib-field">
+              <span class="lib-label">PASSWORD</span>
+              <input type="password" id="account-password" class="lib-input" placeholder="min 6 characters" autocomplete="current-password">
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="lib-btn" id="account-signup-btn" style="flex:1">SIGN UP</button>
+              <button class="lib-btn" id="account-login-btn" style="flex:1">LOG IN</button>
+            </div>
+            <div class="lib-status" id="account-status"></div>
+          </div>
+          <div id="account-logged-in" style="display:none">
+            <div class="lib-status" style="margin-top:0">signed in as <span id="account-username-display"></span><span id="account-admin-badge" style="display:none;color:var(--accent);border:1px solid var(--accent);padding:1px 5px;border-radius:2px;font-size:9px;letter-spacing:1px;margin-left:6px">ADMIN</span></div>
+            <button class="lib-btn" id="account-logout-btn">LOG OUT</button>
+            <div class="lib-status">albums you add are shared with everyone. playlists are private to your account.</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- NOW PLAYING — full visualizer takeover -->
+    <div class="now-playing-overlay" id="now-playing-overlay">
+      <div class="np-header">
+        <span class="np-title">// NOW PLAYING</span>
+        <div style="display:flex;gap:8px">
+          <button class="np-settings-toggle" id="np-settings-toggle">⚙ Settings</button>
+          <button id="np-close">✕ Back to Browse</button>
+        </div>
+      </div>
+      <div class="np-body">
+        <div class="canvas-wrap" id="canvas-wrap">
+          <canvas id="canvas"></canvas>
+          <canvas id="three-canvas"></canvas>
+          <div class="empty-state" id="empty-state">
+            <div class="empty-icon">♪</div>
+            <div class="empty-msg">DROP MUSIC TO START</div>
+            <div class="empty-sub">ALBUM LIBRARY · LOCAL FILES · YOUTUBE QUEUE · MIC INPUT · + 3D MODELS</div>
+          </div>
+          <div class="hud" id="hud" style="display:none">
+            <div class="hud-title">// AUDIO INFO</div>
+            <div class="hud-row"><span class="hud-key">Bass</span><span class="hud-v" id="hud-bass">0</span></div>
+            <div class="hud-row"><span class="hud-key">Mid</span><span class="hud-v" id="hud-mid">0</span></div>
+            <div class="hud-row"><span class="hud-key">Treble</span><span class="hud-v" id="hud-treble">0</span></div>
+            <div class="hud-row"><span class="hud-key">Peak</span><span class="hud-v" id="hud-peak">0</span></div>
+            <div class="eq-bars" id="eq-bars"></div>
+          </div>
+          <div class="model-hud" id="model-hud">// 3D MODEL ACTIVE<br><span id="model-hud-name" style="color:var(--text);font-size:11px"></span></div>
+          <div class="hint-bar">drag → rotate &nbsp;|&nbsp; scroll → zoom &nbsp;|&nbsp; right-drag → pan</div>
+        </div>
+        <aside class="np-settings" id="np-settings">
+          <!-- VOXEL GRID -->
+          <div class="panel">
+            <div class="panel-title">Voxel Grid</div>
+            <div class="control"><div class="ctrl-row"><span class="ctrl-label">Grid Size</span><span class="ctrl-val" id="val-grid">16×8×16</span></div></div>
+            <div class="control"><div class="ctrl-row"><span class="ctrl-label">Width/Depth</span><span class="ctrl-val" id="val-wd">16</span></div><input type="range" id="grid-wd" min="4" max="32" value="16" step="2"></div>
+            <div class="control"><div class="ctrl-row"><span class="ctrl-label">Max Height</span><span class="ctrl-val" id="val-ht">8</span></div><input type="range" id="grid-ht" min="4" max="32" value="8" step="1"></div>
+            <div class="control"><div class="ctrl-row"><span class="ctrl-label">Sensitivity</span><span class="ctrl-val" id="val-sens">1.0</span></div><input type="range" id="sens" min="0.5" max="4" value="1.0" step="0.1"></div>
+            <div class="control"><div class="ctrl-row"><span class="ctrl-label">Smoothing</span><span class="ctrl-val" id="val-smooth">0.85</span></div><input type="range" id="smooth" min="0.1" max="0.97" value="0.85" step="0.01"></div>
+          </div>
+          <!-- VIZ MODE -->
+          <div class="panel">
+            <div class="panel-title">Viz Mode</div>
+            <div class="btn-grid">
+              <button class="px-btn active" data-viz="bars">EQ Bars</button><button class="px-btn" data-viz="wave">Wave</button>
+              <button class="px-btn" data-viz="ring">Ring</button><button class="px-btn" data-viz="rain">Rain</button>
+              <button class="px-btn" data-viz="tunnel">Tunnel</button><button class="px-btn" data-viz="scatter">Scatter</button>
+              <button class="px-btn" data-viz="mirror">Mirror</button><button class="px-btn" data-viz="pyramid">Pyramid</button>
+              <button class="px-btn" data-viz="spiral">Spiral</button><button class="px-btn" data-viz="volcano">Volcano</button>
+              <button class="px-btn" data-viz="dna">DNA</button><button class="px-btn" data-viz="shockwave">Shockwave</button>
+            </div>
+          </div>
+          <!-- COLOR -->
+          <div class="panel">
+            <div class="panel-title">Color Scheme</div>
+            <div class="scheme-grid" id="scheme-grid"></div>
+            <div style="margin-top:10px">
+              <div class="color-row"><span class="ctrl-label">Custom Low</span><input type="color" id="col-lo" value="#44aaff"></div>
+              <div class="color-row"><span class="ctrl-label">Custom High</span><input type="color" id="col-hi" value="#ff4466"></div>
+            </div>
+          </div>
+          <!-- RENDER -->
+          <div class="panel">
+            <div class="panel-title">Render</div>
+            <div class="toggle-row"><span class="ctrl-label">Auto-Rotate</span><label class="toggle"><input type="checkbox" id="auto-rot" checked><div class="ttrack"></div></label></div>
+            <div class="toggle-row"><span class="ctrl-label">Beat Pulse</span><label class="toggle"><input type="checkbox" id="beat-pulse" checked><div class="ttrack"></div></label></div>
+            <div class="toggle-row"><span class="ctrl-label">Glow Effect</span><label class="toggle"><input type="checkbox" id="use-glow" checked><div class="ttrack"></div></label></div>
+            <div class="control"><div class="ctrl-row"><span class="ctrl-label">Glow Level</span><span class="ctrl-val" id="val-glow">0.28</span></div><input type="range" id="glow-level" min="0.02" max="0.8" value="0.28" step="0.02"></div>
+            <div class="toggle-row"><span class="ctrl-label">Show Floor</span><label class="toggle"><input type="checkbox" id="show-floor" checked><div class="ttrack"></div></label></div>
+            <div class="toggle-row"><span class="ctrl-label">Rainbow BG</span><label class="toggle"><input type="checkbox" id="rainbow-bg"><div class="ttrack"></div></label></div>
+            <div class="control" style="margin-top:8px"><div class="ctrl-row"><span class="ctrl-label">Rotation Speed</span><span class="ctrl-val" id="val-rotspd">0.3</span></div><input type="range" id="rot-spd" min="0" max="2" value="0.3" step="0.05"></div>
+            <div class="color-row"><span class="ctrl-label">Background</span><input type="color" id="col-bg" value="#0d0f0b"></div>
+          </div>
+          <!-- 3D MODEL -->
+          <div class="panel">
+            <div class="panel-title" style="color:var(--accent3)">3D Model</div>
+            <div class="model-dz" id="model-dz">
+              <input type="file" id="model-input" accept=".obj,.glb,.gltf">
+              <span class="drop-icon" style="color:var(--accent3)">[◈]</span>
+              <div class="drop-text">Drop <strong style="color:var(--accent3)">.obj .glb .gltf</strong><br>model distorts to the music</div>
+            </div>
+            <div class="model-info" id="model-info"></div>
+            <div id="model-ctrl">
+              <div class="toggle-row" style="margin-top:10px"><span class="ctrl-label">Show Model</span><label class="toggle"><input type="checkbox" id="show-model" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
+              <div class="toggle-row"><span class="ctrl-label">Wireframe</span><label class="toggle"><input type="checkbox" id="model-wire"><div class="ttrack"></div></label></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Distortion</span><span class="ctrl-val" id="val-distort" style="color:var(--accent3)">0.50</span></div><input type="range" id="distort-amt" min="0" max="3" value="0.5" step="0.05"></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Model Scale</span><span class="ctrl-val" id="val-mscale" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-size" min="0.2" max="5" value="1.0" step="0.1"></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Opacity</span><span class="ctrl-val" id="val-mopacity" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-opacity" min="0.05" max="1" value="1.0" step="0.05"></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Emissive Boost</span><span class="ctrl-val" id="val-emissive" style="color:var(--accent3)">0.5</span></div><input type="range" id="emissive-amt" min="0" max="2" value="0.5" step="0.05"></div>
+              <button id="remove-model-btn" class="px-btn" style="width:100%;margin-top:4px;border-color:var(--accent2);color:var(--accent2)">✕ Remove Model</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOCKED PLAYER BAR -->
+  <footer class="player-bar" id="player-bar">
+    <div class="pb-now">
+      <span class="pb-icon">♪</span>
+      <div class="now-playing" id="now-playing">No track selected</div>
+    </div>
+    <div class="pb-center">
+      <div class="pb-transport transport-btns">
+        <button class="tbtn" id="btn-prev">⏮</button>
+        <button class="tbtn play-btn" id="btn-play">▶</button>
+        <button class="tbtn" id="btn-next">⏭</button>
+        <button class="tbtn" id="btn-shuffle" title="Shuffle">⇄</button>
+        <button class="tbtn" id="btn-loop" title="Loop">↻</button>
+      </div>
+      <div class="pb-progress-row">
+        <span id="time-cur">0:00</span>
+        <div class="progress-wrap" id="progress-wrap"><div class="progress-fill" id="progress-fill"></div></div>
+        <span id="time-tot">0:00</span>
+      </div>
+    </div>
+    <div class="pb-right">
+      <div class="vol-row">
+        <span>VOL</span>
+        <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8">
+        <span id="vol-val">80%</span>
+      </div>
+      <button class="pb-expand" id="pb-expand">▲ Visualizer</button>
+    </div>
+  </footer>
+</div>
+
+<audio id="audio-player" crossorigin="anonymous"></audio>
+
+<div class="modal-overlay" id="album-modal">
+  <div class="modal">
+    <button class="modal-close" id="modal-close">✕</button>
+    <div class="modal-head">
+      <img class="modal-art" id="modal-art" src="">
+      <div class="modal-info">
+        <div class="modal-title" id="modal-title"></div>
+        <div class="modal-artist" id="modal-artist"></div>
+        <div class="modal-tags" id="modal-tags"></div>
+        <div class="modal-actions">
+          <button class="lib-btn" id="modal-play-all" style="width:auto;padding:6px 12px;margin-top:0">▶ PLAY ALL</button>
+          <button class="lib-btn" id="modal-edit" style="width:auto;padding:6px 12px;margin-top:0;display:none;border-color:var(--accent3);color:var(--accent3)">✎ EDIT ALBUM</button>
+          <button class="lib-btn" id="modal-delete" style="width:auto;padding:6px 12px;margin-top:0;display:none;border-color:var(--accent2);color:var(--accent2)">DELETE ALBUM</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-body" id="modal-tracklist"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  COLOR SCHEMES
+// ═══════════════════════════════════════════════════════════
+const SCHEMES=[
+  {name:'Acid',   lo:[40,200,60],   hi:[200,255,40]},
+  {name:'Fire',   lo:[255,60,0],    hi:[255,220,0]},
+  {name:'Ice',    lo:[0,100,255],   hi:[100,230,255]},
+  {name:'Vapor',  lo:[180,0,255],   hi:[255,0,140]},
+  {name:'Sunset', lo:[255,40,100],  hi:[255,180,0]},
+  {name:'Matrix', lo:[0,80,20],     hi:[0,255,80]},
+  {name:'Coral',  lo:[255,80,120],  hi:[255,200,150]},
+  {name:'Rainbow',lo:null,hi:null,rainbow:true},
+  {name:'Custom', lo:null,hi:null},
+];
+let activeScheme=0;
+
+function buildSchemeGrid(){
+  const g=document.getElementById('scheme-grid');
+  SCHEMES.forEach((s,i)=>{
+    const b=document.createElement('button');
+    b.className='scheme-btn'+(i===0?' active':'');
+    if(s.rainbow){b.style.background='linear-gradient(135deg,#f00,#f80,#ff0,#0f0,#08f,#80f,#f08)';b.style.fontSize='8px';b.style.color='#fff';b.style.fontFamily='IBM Plex Mono';b.textContent='RBW';}
+    else if(s.lo){b.style.background=`linear-gradient(135deg,rgb(${s.lo}) 0%,rgb(${s.hi}) 100%)`;}
+    else{b.style.background='linear-gradient(135deg,#44aaff,#ff4466)';b.style.fontSize='8px';b.style.color='#fff';b.style.fontFamily='IBM Plex Mono';b.textContent='CUST';}
+    b.title=s.name;
+    b.addEventListener('click',()=>{activeScheme=i;document.querySelectorAll('.scheme-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');});
+    g.appendChild(b);
+  });
+}
+
+function hsvToRgb(h,s,v){
+  const i=Math.floor(h*6),f=h*6-i,p=v*(1-s),q=v*(1-f*s),t=v*(1-(1-f)*s);
+  let r,g,b;switch(i%6){case 0:r=v,g=t,b=p;break;case 1:r=q,g=v,b=p;break;case 2:r=p,g=v,b=t;break;case 3:r=p,g=q,b=v;break;case 4:r=t,g=p,b=v;break;default:r=v,g=p,b=q;}
+  return[r*255|0,g*255|0,b*255|0];
+}
+function hexToRgb(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+let frame=0;
+function getColor(t,boost=0){
+  const s=SCHEMES[activeScheme];
+  if(s.rainbow){return hsvToRgb(((t*.6+frame*.004)%1),.9,Math.min(1,.4+t*.6+boost*.3));}
+  const lo=s.lo||hexToRgb(document.getElementById('col-lo').value);
+  const hi=s.hi||hexToRgb(document.getElementById('col-hi').value);
+  const b=Math.min(1,t+boost);
+  return[(lo[0]+(hi[0]-lo[0])*b)|0,(lo[1]+(hi[1]-lo[1])*b)|0,(lo[2]+(hi[2]-lo[2])*b)|0];
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AUDIO ENGINE
+// ═══════════════════════════════════════════════════════════
+let audioCtx=null,analyser=null,srcNode=null;
+const FFT=512;
+let freqData=new Uint8Array(FFT/2),smoothed=new Float32Array(FFT/2);
+let lastBeat=0,bpm=0,bpmBuf=[];
+let micActive=false,micAnalyser=null,micStream=null;
+// YouTube playback can't expose raw audio to the browser (platform restriction,
+// not something we can code around) — so while it's the active source we drive
+// the grid off a simulated, rhythmic envelope instead of a real FFT.
+let ytIsPlaying=false,usingSimulated=false;
+let simSeed=0.3,simBPM=110,simLastBeat=0,simBeatEnv=0;
+
+function initAudio(){
+  if(audioCtx)return;
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  analyser=audioCtx.createAnalyser();analyser.fftSize=FFT;analyser.smoothingTimeConstant=.1;
+  srcNode=audioCtx.createMediaElementSource(document.getElementById('audio-player'));
+  srcNode.connect(analyser);analyser.connect(audioCtx.destination);
+}
+
+function hasAudio(){return !!(analyser||(micActive&&micAnalyser)||ytIsPlaying);}
+
+// seed the simulated rhythm per-track so different songs don't all pulse identically
+function seedSimulation(key){
+  let h=0;for(let i=0;i<String(key).length;i++)h=(h*31+String(key).charCodeAt(i))>>>0;
+  simSeed=(h%1000)/1000;simBPM=84+(h%52);simLastBeat=performance.now()/1000;simBeatEnv=0;
+}
+function simulateFrame(){
+  const n=freqData.length,t=performance.now()/1000;
+  for(let i=0;i<n;i++){
+    const bp=i/n;
+    let v=0.12+0.42*Math.abs(Math.sin(t*0.55+bp*6+simSeed*10));
+    v+=0.22*Math.abs(Math.sin(t*2.1+bp*13+simSeed*20));
+    v+=simBeatEnv*(1-bp*0.7)*0.55;
+    freqData[i]=Math.max(0,Math.min(1,v))*255;
+  }
+  const sm=Math.min(.8,+document.getElementById('smooth').value);
+  for(let i=0;i<n;i++)smoothed[i]=smoothed[i]*sm+freqData[i]*(1-sm);
+  simBeatEnv*=0.86;
+  const interval=60/simBPM;
+  if(t-simLastBeat>interval){simBeatEnv=1;simLastBeat=t;}
+}
+
+function readAudio(){
+  usingSimulated=false;
+  if(micActive&&micAnalyser){
+    micAnalyser.getByteFrequencyData(freqData);
+    const sm=+document.getElementById('smooth').value;
+    for(let i=0;i<freqData.length;i++)smoothed[i]=smoothed[i]*sm+freqData[i]*(1-sm);
+    return;
+  }
+  if(ytIsPlaying){ usingSimulated=true; simulateFrame(); return; }
+  if(!analyser)return;
+  analyser.getByteFrequencyData(freqData);
+  const sm=+document.getElementById('smooth').value;
+  for(let i=0;i<freqData.length;i++)smoothed[i]=smoothed[i]*sm+freqData[i]*(1-sm);
+}
+
+function band(lo,hi){
+  const n=freqData.length,s=lo*n|0,e=Math.ceil(hi*n);
+  let sum=0,c=0;for(let i=s;i<e;i++){sum+=smoothed[i];c++;}return c?sum/c/255:0;
+}
+
+function detectBeat(){
+  const b=band(0,.1),now=performance.now();
+  if(b>.6&&now-lastBeat>300){
+    if(lastBeat>0){bpmBuf.push(60000/(now-lastBeat));if(bpmBuf.length>8)bpmBuf.shift();bpm=Math.round(bpmBuf.reduce((a,b)=>a+b)/bpmBuf.length);}
+    lastBeat=now;return true;
+  }return false;
+}
+
+// ── Mic ──────────────────────────────────────────────────
+async function toggleMic(){
+  const btn=document.getElementById('mic-btn');
+  if(micActive){
+    if(micStream)micStream.getTracks().forEach(t=>t.stop());
+    micStream=null;micAnalyser=null;micActive=false;
+    btn.classList.remove('on');btn.textContent='🎤 Enable Mic / System Audio Input';
+  }else{
+    try{
+      if(!audioCtx){audioCtx=new(window.AudioContext||window.webkitAudioContext)();}
+      if(audioCtx.state==='suspended')await audioCtx.resume();
+      micStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+      micAnalyser=audioCtx.createAnalyser();micAnalyser.fftSize=FFT;micAnalyser.smoothingTimeConstant=.1;
+      audioCtx.createMediaStreamSource(micStream).connect(micAnalyser);
+      micActive=true;
+      btn.classList.add('on');btn.textContent='🎤 MIC ACTIVE — click to stop';
+      showHUD();
+    }catch(e){alert('Mic access denied. Allow mic permission in your browser.');}
+  }
+}
+document.getElementById('mic-btn').addEventListener('click',toggleMic);
+
+// ═══════════════════════════════════════════════════════════
+//  LOCAL PLAYLIST
+// ═══════════════════════════════════════════════════════════
+let tracks=[],curTrack=-1,playing=false,shuffle=false,loop=false;
+let activeEngine='local'; // 'local' = <audio> element (files or 30s previews) | 'yt' = YouTube iframe
+const audio=document.getElementById('audio-player');
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escAttr(s){ return esc(s); }
+function playLocalUrl(url,title,artist){
+  initAudio();if(audioCtx.state==='suspended')audioCtx.resume();
+  activeEngine='local';curTrack=-1;
+  if(ytPlayer&&ytIsPlaying){try{ytPlayer.pauseVideo();}catch(e){}}
+  audio.src=url;audio.play().then(()=>{playing=true;document.getElementById('btn-play').textContent='⏸';}).catch(()=>{});
+  document.getElementById('now-playing').innerHTML=`<span>♪</span> ${esc(title)}${artist?' — '+esc(artist):''} <span style="opacity:.55">(30s preview)</span>`;
+  showHUD();
+}
+
+function showHUD(){document.getElementById('empty-state').style.display='none';document.getElementById('hud').style.display='block';}
+function fmt(s){if(isNaN(s))return'0:00';return`${0|s/60}:${String(0|s%60).padStart(2,'0')}`;}
+
+function addTracks(files){
+  Array.from(files).forEach(f=>{tracks.push({name:f.name.replace(/\.[^/.]+$/,''),url:URL.createObjectURL(f),dur:0});});
+  renderPL();
+  document.getElementById('h-tracks').textContent=tracks.length;
+  if(tracks.length===1&&curTrack===-1)loadTrack(0);
+  showHUD();
+}
+function renderPL(){
+  const pl=document.getElementById('playlist');pl.innerHTML='';
+  tracks.forEach((t,i)=>{
+    const d=document.createElement('div');d.className='track-item'+(i===curTrack?' active':'');
+    d.innerHTML=`<span class="playing-icon">▶</span><span class="track-num">${i+1}</span><span class="track-name" title="${t.name}">${t.name}</span><span class="track-dur">${t.dur?fmt(t.dur):'—'}</span>`;
+    d.addEventListener('click',()=>loadTrack(i,true));pl.appendChild(d);
+  });
+}
+function loadTrack(i,auto=false){
+  if(i<0||i>=tracks.length)return;
+  activeEngine='local';
+  if(ytPlayer&&ytIsPlaying){try{ytPlayer.pauseVideo();}catch(e){}}
+  curTrack=i;audio.src=tracks[i].url;audio.load();
+  document.getElementById('now-playing').innerHTML=`<span>♪</span> ${tracks[i].name}`;
+  renderPL();
+  if(auto||playing){audio.play().then(()=>{playing=true;document.getElementById('btn-play').textContent='⏸';initAudio();if(audioCtx.state==='suspended')audioCtx.resume();}).catch(()=>{});}
+}
+function playPause(){
+  initAudio();if(audioCtx.state==='suspended')audioCtx.resume();
+  if(curTrack===-1&&tracks.length){loadTrack(0,true);return;}
+  if(playing){audio.pause();playing=false;document.getElementById('btn-play').textContent='▶';}
+  else{audio.play().then(()=>{playing=true;document.getElementById('btn-play').textContent='⏸';}).catch(()=>{});}
+}
+function nextTrack(){if(!tracks.length)return;loadTrack(shuffle?Math.random()*tracks.length|0:(curTrack+1)%tracks.length,true);}
+function prevTrack(){if(!tracks.length)return;if(audio.currentTime>3){audio.currentTime=0;return;}loadTrack((curTrack-1+tracks.length)%tracks.length,true);}
+
+audio.addEventListener('timeupdate',()=>{
+  const p=audio.duration?audio.currentTime/audio.duration*100:0;
+  document.getElementById('progress-fill').style.width=p+'%';
+  document.getElementById('time-cur').textContent=fmt(audio.currentTime);
+  document.getElementById('time-tot').textContent=fmt(audio.duration);
+});
+audio.addEventListener('ended',()=>{if(loop){audio.currentTime=0;audio.play();}else nextTrack();});
+audio.addEventListener('loadedmetadata',()=>{if(curTrack>=0){tracks[curTrack].dur=audio.duration;renderPL();}});
+
+document.getElementById('progress-wrap').addEventListener('click',e=>{
+  const r=e.currentTarget.getBoundingClientRect();if(audio.duration)audio.currentTime=((e.clientX-r.left)/r.width)*audio.duration;
+});
+document.getElementById('btn-play').addEventListener('click',()=>{
+  if(activeEngine==='yt'&&ytPlayer&&ytReady){
+    const st=ytPlayer.getPlayerState();
+    if(st===1)ytPlayer.pauseVideo();else ytPlayer.playVideo();
+  } else playPause();
+});
+document.getElementById('btn-next').addEventListener('click',()=>{ if(activeEngine==='yt')ytNext();else nextTrack(); });
+document.getElementById('btn-prev').addEventListener('click',()=>{ if(activeEngine==='yt')ytPrev();else prevTrack(); });
+document.getElementById('btn-shuffle').addEventListener('click',function(){shuffle=!shuffle;this.classList.toggle('active',shuffle);});
+document.getElementById('btn-loop').addEventListener('click',function(){loop=!loop;this.classList.toggle('active',loop);});
+document.getElementById('vol').addEventListener('input',e=>{audio.volume=+e.target.value;document.getElementById('vol-val').textContent=Math.round(+e.target.value*100)+'%';});
+
+const dz=document.getElementById('dropzone');
+document.getElementById('file-input').addEventListener('change',e=>addTracks(e.target.files));
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');addTracks(e.dataTransfer.files);});
+document.getElementById('canvas-wrap').addEventListener('dragover',e=>e.preventDefault());
+document.getElementById('canvas-wrap').addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files.length)addTracks(e.dataTransfer.files);});
+
+// ═══════════════════════════════════════════════════════════
+//  YOUTUBE QUEUE
+// ═══════════════════════════════════════════════════════════
+let ytPlayer=null,ytQ=[],ytIdx=-1,ytReady=false,ytPendingLoad=null;
+(function(){const s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';document.head.appendChild(s);})();
+window.onYouTubeIframeAPIReady=function(){
+  ytPlayer=new YT.Player('yt-player',{
+    height:'100%',width:'100%',videoId:'',
+    playerVars:{autoplay:0,controls:1,rel:0,modestbranding:1},
+    events:{
+      onReady(){ytReady=true;if(ytPendingLoad){const p=ytPendingLoad;ytPendingLoad=null;p();}},
+      onStateChange(e){
+        ytIsPlaying = e.data===YT.PlayerState.PLAYING;
+        if(e.data===YT.PlayerState.PLAYING){playing=true;document.getElementById('btn-play').textContent='⏸';showHUD();}
+        if(e.data===YT.PlayerState.PAUSED){playing=false;document.getElementById('btn-play').textContent='▶';}
+        if(e.data===YT.PlayerState.ENDED)ytNext();
+      },
+      onError(){ ytHandleError(); }
+    }
+  });
+};
+
+function parseYT(url){
+  const v=url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  const p=url.match(/[?&]list=([A-Za-z0-9_-]+)/);
+  return{vid:v?v[1]:null,pid:p?p[1]:null};
+}
+
+async function ytAdd(){
+  const raw=document.getElementById('yt-input').value.trim();if(!raw)return;
+  const{vid,pid}=parseYT(raw);
+  if(!vid&&!pid){alert('Could not recognize a YouTube URL.');return;}
+  let title='YouTube';
+  if(vid){try{const r=await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${vid}&format=json`);if(r.ok)title=(await r.json()).title||title;}catch(e){title=`Video ${vid}`;}}
+  else{title=`Playlist (${pid.slice(0,14)}…)`;}
+  ytQ.push({vid,pid,title});renderYtQ();
+  if(ytIdx===-1)ytLoad(ytQ.length-1);
+  document.getElementById('yt-input').value='';
+  document.getElementById('yt-wrap').style.display='block';
+  document.getElementById('yt-empty').style.display='none';
+  showHUD();
+}
+
+document.getElementById('yt-add-btn').addEventListener('click',ytAdd);
+document.getElementById('yt-input').addEventListener('keydown',e=>{if(e.key==='Enter')ytAdd();});
+
+function renderYtQ(){
+  const el=document.getElementById('yt-queue');el.innerHTML='';
+  ytQ.forEach((q,i)=>{
+    const d=document.createElement('div');d.className='track-item'+(i===ytIdx?' active':'');
+    const status=q.resolving?'⏳':(q.failed?'✕':(i+1));
+    d.innerHTML=`<span class="playing-icon">▶</span><span class="track-num">${status}</span><span class="track-name" title="${escAttr(q.title)}">${esc(q.title)}${q.artist?' <span style="opacity:.6">— '+esc(q.artist)+'</span>':''}</span><span class="yt-del" title="Remove">✕</span>`;
+    d.querySelector('.yt-del').addEventListener('click',ev=>{ev.stopPropagation();ytRemove(i);});
+    d.addEventListener('click',()=>ytLoad(i));el.appendChild(d);
+  });
+}
+async function ytLoad(i){
+  if(i<0||i>=ytQ.length||!ytPlayer)return;
+  ytIdx=i;const q=ytQ[i];
+  activeEngine='yt';
+  if(!audio.paused){audio.pause();}
+  document.getElementById('yt-wrap').style.display='block';
+  document.getElementById('yt-empty').style.display='none';
+  document.getElementById('now-playing').innerHTML=`<span>♪</span> ${esc(q.title)}${q.artist?' — '+esc(q.artist):''}`;
+  renderYtQ();showHUD();
+  seedSimulation(q.vid||q.title+q.artist);
+  if(!q.vid&&!q.pid){
+    if(q.resolving)return;
+    q.resolving=true;renderYtQ();
+    const found=await searchYouTubeVideoId(`${q.artist||''} ${q.title} audio`.trim());
+    q.resolving=false;
+    if(ytIdx!==i)return; // navigated away while searching
+    if(!found){
+      q.failed=true;renderYtQ();
+      document.getElementById('now-playing').innerHTML=`<span style="color:var(--accent2)">✕</span> couldn't find "${esc(q.title)}" on YouTube`;
+      return;
+    }
+    q.vid=found;seedSimulation(found);
+    if(q.trackId&&sb)sb.from('tracks').update({youtube_video_id:found}).eq('id',q.trackId).then(()=>{},()=>{});
+    renderYtQ();
+  }
+  const doLoad=()=>{
+    try{
+      if(q.pid&&!q.vid)ytPlayer.loadPlaylist({list:q.pid,listType:'playlist'});
+      else if(q.vid){if(q.pid)ytPlayer.loadVideoById({videoId:q.vid,list:q.pid,listType:'playlist'});else ytPlayer.loadVideoById(q.vid);}
+    }catch(e){}
+  };
+  if(ytReady)doLoad();else ytPendingLoad=doLoad;
+}
+// A video can error out (embedding disabled, removed, region-blocked) even though
+// it exists — this is common for label-uploaded "full album" videos. When that
+// happens, search once for an alternate ("official audio") upload of the same
+// track and swap it in, caching the replacement so we don't hit this again.
+async function ytHandleError(){
+  const i=ytIdx; if(i<0||i>=ytQ.length)return;
+  const q=ytQ[i];
+  if(q.errorRetried){
+    q.failed=true;renderYtQ();
+    document.getElementById('now-playing').innerHTML=`<span style="color:var(--accent2)">✕</span> "${esc(q.title)}" can't be played (removed or restricted)`;
+    return;
+  }
+  q.errorRetried=true;q.resolving=true;renderYtQ();
+  const found=await searchYouTubeVideoId(`${q.artist||''} ${q.title} audio`.trim());
+  q.resolving=false;
+  if(ytIdx!==i)return; // navigated away while searching
+  if(!found||found===q.vid){
+    q.failed=true;renderYtQ();
+    document.getElementById('now-playing').innerHTML=`<span style="color:var(--accent2)">✕</span> couldn't play "${esc(q.title)}" on YouTube`;
+    return;
+  }
+  q.vid=found;q.failed=false;seedSimulation(found);renderYtQ();
+  if(q.trackId&&sb)sb.from('tracks').update({youtube_video_id:found}).eq('id',q.trackId).then(()=>{},()=>{});
+  try{ ytPlayer.loadVideoById(q.vid); }catch(e){}
+}
+function ytNext(){if(!ytQ.length)return;ytLoad((ytIdx+1)%ytQ.length);}
+function ytPrev(){if(!ytQ.length)return;ytLoad((ytIdx-1+ytQ.length)%ytQ.length);}
+function ytRemove(i){
+  ytQ.splice(i,1);if(ytIdx>=ytQ.length)ytIdx=ytQ.length-1;renderYtQ();
+  if(!ytQ.length){document.getElementById('yt-wrap').style.display='none';document.getElementById('yt-empty').style.display='block';ytIdx=-1;ytIsPlaying=false;}
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LIBRARY BACKEND (Supabase + YouTube search/import + playback)
+// ═══════════════════════════════════════════════════════════
+// ---- config — replace these with your own project's values ----
+const SUPABASE_URL = 'https://eepyrwxplzgvxfwmtjsv.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_HfKPjZSEQ31YJBQqdDaEXQ_l4_PhK53';
+const YT_API_KEY = 'AIzaSyCVL0aQbZKcBXJ6ueB-j-2zQ1HquZaqYRw'; // Google Cloud Console → enable "YouTube Data API v3" → Credentials → API key
+const CONFIGURED = !SUPABASE_URL.startsWith('YOUR_') && !SUPABASE_KEY.startsWith('YOUR_');
+const YT_SEARCH_CONFIGURED = !YT_API_KEY.startsWith('YOUR_');
+const sb = CONFIGURED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+let bannerStackBottom = 12;
+function addConfigBanner(text, color){
+  const banner = document.createElement('div');
+  banner.className = 'config-banner';
+  banner.style.bottom = bannerStackBottom + 'px';
+  if(color) banner.style.background = color;
+  banner.textContent = text;
+  banner.addEventListener('click', ()=> banner.remove());
+  document.body.appendChild(banner);
+  bannerStackBottom += 54;
+}
+if(!CONFIGURED) addConfigBanner('Supabase not configured — see README.md.');
+if(CONFIGURED && !YT_SEARCH_CONFIGURED) addConfigBanner('No YouTube API key — Add Album search is disabled.', 'var(--accent2)');
+
+// ---- accounts: username mapped to a synthetic email ----
+const USERNAME_AUTH_DOMAIN = 'cratefm.local';
+const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
+function usernameToAuthEmail(u){ return u.toLowerCase() + '@' + USERNAME_AUTH_DOMAIN; }
+function authEmailToUsername(e){ return (e||'').split('@')[0]; }
+
+let libCurrentUser = null;
+let libAlbums = [];        // {id,title,artist,artwork_url,release_date,genre,added_by,tracks:[...]}
+let libPlaylists = [];     // {id,name,playlist_tracks:[{id,position,tracks:{...,albums:{...}}}]}
+let libSearchTerm = '';
+let libActiveAlbumId = null;
+
+// ---- YouTube album search (search for full-album playlists) ----
+async function searchYouTubeAlbums(term){
+  if(!YT_SEARCH_CONFIGURED) throw new Error('no YouTube API key configured');
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=playlist&maxResults=12&q=${encodeURIComponent(term + ' full album')}&key=${YT_API_KEY}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('YouTube search failed (' + res.status + ')');
+  const data = await res.json();
+  return (data.items || [])
+    .filter(it => it.id && it.id.playlistId)
+    .map(it => ({
+      playlistId: it.id.playlistId,
+      title: it.snippet.title,
+      channelTitle: it.snippet.channelTitle,
+      thumbnail: (it.snippet.thumbnails && (it.snippet.thumbnails.high || it.snippet.thumbnails.medium || it.snippet.thumbnails.default) || {}).url || ''
+    }));
+}
+// ---- YouTube playlist → tracklist (with per-video durations) ----
+function iso8601DurationToMs(dur){
+  const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(dur || '');
+  if(!m) return null;
+  const h = +(m[1]||0), min = +(m[2]||0), s = +(m[3]||0);
+  return ((h*60 + min)*60 + s) * 1000;
+}
+async function fetchYouTubePlaylistTracks(playlistId){
+  let items = [], pageToken = '';
+  do{
+    const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${encodeURIComponent(playlistId)}&key=${YT_API_KEY}` + (pageToken ? '&pageToken=' + pageToken : '');
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('could not load playlist tracks (' + res.status + ')');
+    const data = await res.json();
+    items = items.concat(data.items || []);
+    pageToken = data.nextPageToken || '';
+  } while(pageToken && items.length < 200);
+  items = items.filter(it => it.contentDetails && it.contentDetails.videoId &&
+    it.snippet && it.snippet.title !== 'Deleted video' && it.snippet.title !== 'Private video');
+  const ids = items.map(it => it.contentDetails.videoId);
+  const durations = {}, embeddable = {};
+  for(let i=0; i<ids.length; i+=50){
+    const batch = ids.slice(i, i+50);
+    try{
+      const res2 = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status&id=${batch.join(',')}&key=${YT_API_KEY}`);
+      if(res2.ok){
+        const data2 = await res2.json();
+        (data2.items || []).forEach(v => {
+          durations[v.id] = iso8601DurationToMs(v.contentDetails.duration);
+          embeddable[v.id] = v.status ? v.status.embeddable !== false : true;
+        });
+      }
+    }catch(e){ /* durations/embeddability are a nice-to-have — skip silently on failure */ }
+  }
+  // Drop videos the API has already told us can't be embedded — they'd just error on playback.
+  items = items.filter(it => embeddable[it.contentDetails.videoId] !== false);
+  return items.map((it, i) => ({
+    videoId: it.contentDetails.videoId,
+    title: it.snippet.title,
+    position: it.snippet.position != null ? it.snippet.position : i,
+    duration_ms: durations[it.contentDetails.videoId] || null
+  }));
+}
+
+// ---- YouTube search (resolves a track to a playable video; results are cached in Supabase) ----
+async function searchYouTubeVideoId(query){
+  if(!YT_SEARCH_CONFIGURED) return null;
+  try{
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&videoCategoryId=10&q=${encodeURIComponent(query)}&key=${YT_API_KEY}`;
+    const res = await fetch(url);
+    if(!res.ok) return null;
+    const data = await res.json();
+    const item = (data.items||[])[0];
+    return item ? item.id.videoId : null;
+  }catch(e){ console.error('YouTube search failed', e); return null; }
+}
+
+// ---- data loading ----
+function setSyncStatus(state, text){
+  document.getElementById('sync-dot').className = 'sync-dot' + (state?' '+state:'');
+  document.getElementById('sync-text').textContent = text;
+}
+async function loadLibAlbums(){
+  if(!CONFIGURED) return;
+  setSyncStatus('', 'loading library...');
+  const { data, error } = await sb.from('albums').select('*, tracks(*)').order('created_at', {ascending:false});
+  if(error){ console.error(error); setSyncStatus('err', 'could not load — check console'); return; }
+  libAlbums = (data||[]).map(a=>({ ...a, tracks: (a.tracks||[]).sort((x,y)=>(x.track_number||0)-(y.track_number||0)) }));
+  setSyncStatus('ok', `synced · ${libAlbums.length} albums`);
+  renderLibAlbumList();
+}
+async function loadLibPlaylists(){
+  if(!libCurrentUser){ libPlaylists = []; renderLibPlaylists(); return; }
+  const { data, error } = await sb.from('playlists')
+    .select('*, playlist_tracks(id, position, tracks(*, albums(id,title,artist,artwork_url)))')
+    .eq('user_id', libCurrentUser.id)
+    .order('created_at', {ascending:true});
+  if(error){ console.error(error); return; }
+  libPlaylists = (data||[]).map(p=>({ ...p, playlist_tracks: (p.playlist_tracks||[]).sort((a,b)=>(a.position||0)-(b.position||0)) }));
+  renderLibPlaylists();
+}
+
+// ---- rendering: sidebar album list ----
+function renderLibAlbumList(){
+  const el = document.getElementById('lib-album-list');
+  if(!CONFIGURED){ el.innerHTML = '<div class="empty-note">connect Supabase to load your library</div>'; return; }
+  const q = libSearchTerm.toLowerCase();
+  const list = libAlbums.filter(a => !q || a.title.toLowerCase().includes(q) || a.artist.toLowerCase().includes(q));
+  if(list.length === 0){ el.innerHTML = '<div class="empty-note">no albums yet — search & add one above</div>'; return; }
+  el.innerHTML = list.map(a=>`
+    <div class="lib-album-item ${libActiveAlbumId===a.id?'active':''}" data-album-id="${a.id}">
+      <span class="lib-album-name">${esc(a.title)} <span style="opacity:.6">— ${esc(a.artist)}</span></span>
+      <span class="lib-album-count">${a.tracks?a.tracks.length:0}</span>
+    </div>`).join('');
+  el.querySelectorAll('.lib-album-item').forEach(item=>{
+    item.addEventListener('click', ()=> openAlbumModal(Number(item.dataset.albumId)));
+  });
+}
+document.getElementById('lib-search').addEventListener('input', e=>{ libSearchTerm = e.target.value; renderLibAlbumList(); });
+
+// ---- album modal ----
+function playlistOptionsHtml(){
+  if(!libCurrentUser) return '';
+  let opts = '<option value="">+ add to playlist...</option>';
+  libPlaylists.forEach(p => opts += `<option value="${p.id}">${esc(p.name)}</option>`);
+  opts += '<option value="__new__">+ new playlist...</option>';
+  return opts;
+}
+function mtrackRowHtml(t, opts){
+  opts = opts || {};
+  const dur = t.duration_ms ? msToTime(t.duration_ms) : '--:--';
+  const srcTag = t.youtube_video_id ? '<span class="lib-source-tag yt">YT</span>' : '';
+  return `
+    <div class="mtrack-row" data-track-id="${t.id}">
+      ${opts.showNum!==false?`<div class="mtrack-num">${t.track_number||''}</div>`:''}
+      <div class="mtrack-play" data-action="play" title="play on YouTube">▶</div>
+      ${opts.showThumb?`<img class="mtrack-thumb" src="${escAttr(t.albums?.artwork_url||t.album?.artwork_url||'')}">`:''}
+      <div class="mtrack-meta">
+        <div class="mtrack-title">${esc(t.title)}</div>
+        ${opts.showArtist?`<div class="mtrack-artist">${esc(t.albums?.artist||t.album?.artist||'')}</div>`:''}
+      </div>
+      ${srcTag}
+      <div class="mtrack-dur">${dur}</div>
+      <div class="mtrack-actions">
+        ${libCurrentUser?`<select class="mtrack-select" style="width:auto">${playlistOptionsHtml()}</select>`:''}
+        ${opts.removeBtn?`<button class="mtrack-icon-btn" data-action="remove" title="remove from playlist">✕</button>`:''}
+      </div>
+    </div>`;
+}
+function wireMtrackRow(rowEl, track, queueList, opts){
+  opts = opts || {};
+  rowEl.querySelector('[data-action="play"]').addEventListener('click', ()=>{
+    const idx = queueList.findIndex(t=>t.id===track.id);
+    playLibQueue(queueList, idx);
+  });
+  const sel = rowEl.querySelector('.mtrack-select');
+  if(sel){
+    sel.addEventListener('change', async ()=>{
+      const val = sel.value; sel.value = '';
+      if(!val) return;
+      if(val === '__new__'){
+        const name = prompt('Name your new playlist:');
+        if(!name || !name.trim()) return;
+        const pl = await createLibPlaylist(name.trim());
+        if(pl) await addTrackToLibPlaylist(pl.id, track.id);
+      } else {
+        await addTrackToLibPlaylist(Number(val), track.id);
+      }
+    });
+  }
+  if(opts.removeBtn){ rowEl.querySelector('[data-action="remove"]').addEventListener('click', ()=> opts.onRemove()); }
+}
+function msToTime(ms){ const s=Math.floor(ms/1000); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+function openAlbumModal(albumId){
+  const album = libAlbums.find(a=>a.id===albumId);
+  if(!album) return;
+  libActiveAlbumId = albumId; renderLibAlbumList();
+  document.getElementById('modal-art').src = album.artwork_url || '';
+  document.getElementById('modal-title').textContent = album.title;
+  document.getElementById('modal-artist').textContent = album.artist;
+  document.getElementById('modal-tags').innerHTML = `
+    ${album.genre?`<span class="tag">${esc(album.genre)}</span>`:''}
+    ${album.release_date?`<span class="tag">${new Date(album.release_date).getFullYear()}</span>`:''}
+    <span class="tag">${album.tracks.length} tracks</span>`;
+  const canManage = !!(libCurrentUser && (album.added_by === libCurrentUser.id || libIsAdmin));
+  const delBtn = document.getElementById('modal-delete');
+  delBtn.style.display = canManage ? 'inline-block' : 'none';
+  delBtn.onclick = ()=> deleteLibAlbum(album.id);
+  const editBtn = document.getElementById('modal-edit');
+  editBtn.style.display = canManage ? 'inline-block' : 'none';
+  editBtn.onclick = ()=> editLibAlbum(album.id);
+
+  const queueList = album.tracks.map(t => ({...t, albums: {title:album.title, artist:album.artist, artwork_url:album.artwork_url}}));
+  const listEl = document.getElementById('modal-tracklist');
+  listEl.innerHTML = queueList.map(t => mtrackRowHtml(t, {removeBtn:canManage})).join('');
+  listEl.querySelectorAll('.mtrack-row').forEach(row=>{
+    const t = queueList.find(x=>x.id === Number(row.dataset.trackId));
+    wireMtrackRow(row, t, queueList, {removeBtn:canManage, onRemove: ()=> deleteLibTrack(t.id, album.id)});
+  });
+  document.getElementById('modal-play-all').onclick = ()=> playLibQueue(queueList, 0);
+  document.getElementById('album-modal').classList.add('open');
+}
+
+// ---- admin/owner: edit album metadata, delete a single track ----
+async function editLibAlbum(albumId){
+  const album = libAlbums.find(a=>a.id===albumId);
+  if(!album) return;
+  const title = prompt('Album title:', album.title);
+  if(title === null) return;
+  const artist = prompt('Artist:', album.artist);
+  if(artist === null) return;
+  const artwork_url = prompt('Artwork URL:', album.artwork_url || '');
+  if(artwork_url === null) return;
+  const { error } = await sb.from('albums').update({ title: title.trim(), artist: artist.trim(), artwork_url: artwork_url.trim() }).eq('id', albumId);
+  if(error){ console.error(error); alert('could not save changes — check console.'); return; }
+  await loadLibAlbums();
+  openAlbumModal(albumId);
+}
+async function deleteLibTrack(trackId, albumId){
+  if(!confirm('Remove this track from the album? This removes it for everyone.')) return;
+  const { error } = await sb.from('tracks').delete().eq('id', trackId);
+  if(error){ console.error(error); alert('could not remove track — check console.'); return; }
+  await loadLibAlbums();
+  openAlbumModal(albumId);
+}
+document.getElementById('modal-close').addEventListener('click', ()=> document.getElementById('album-modal').classList.remove('open'));
+document.getElementById('album-modal').addEventListener('click', e=>{ if(e.target.id === 'album-modal') e.currentTarget.classList.remove('open'); });
+
+// ---- add album (search + import) ----
+async function doAlbumSearch(){
+  const term = document.getElementById('album-search-input').value.trim();
+  const statusEl = document.getElementById('album-search-status');
+  const resultsEl = document.getElementById('album-search-results');
+  if(!term){ statusEl.textContent = 'type something to search for.'; return; }
+  if(!YT_SEARCH_CONFIGURED){ statusEl.textContent = 'no YouTube API key configured — see README.md.'; return; }
+  statusEl.textContent = 'searching YouTube...';
+  resultsEl.innerHTML = '';
+  try{
+    const results = await searchYouTubeAlbums(term);
+    statusEl.textContent = results.length ? `${results.length} result(s)` : 'no results found.';
+    resultsEl.innerHTML = results.map((r,i) => `
+      <div class="sr-item" data-index="${i}">
+        <img src="${escAttr(r.thumbnail)}">
+        <div class="sr-meta">
+          <div class="sr-title">${esc(r.title)}</div>
+          <div class="sr-sub">${esc(r.channelTitle)}</div>
+        </div>
+        <button class="sr-add" data-action="add">ADD</button>
+      </div>`).join('');
+    resultsEl.querySelectorAll('.sr-item').forEach(item=>{
+      const r = results[Number(item.dataset.index)];
+      item.querySelector('.sr-add').addEventListener('click', ()=> importLibAlbum(r, item.querySelector('.sr-add')));
+    });
+  }catch(e){
+    console.error(e);
+    statusEl.textContent = 'search failed — check your connection and try again.';
+  }
+}
+async function importLibAlbum(result, btnEl){
+  if(!libCurrentUser) return;
+  if(libAlbums.some(a => a.youtube_playlist_id === result.playlistId)){
+    if(btnEl){ btnEl.textContent = 'ALREADY IN LIBRARY'; btnEl.disabled = true; }
+    return;
+  }
+  const statusEl = document.getElementById('album-search-status');
+  if(btnEl){ btnEl.disabled = true; btnEl.textContent = '...'; }
+  try{
+    const trks = await fetchYouTubePlaylistTracks(result.playlistId);
+    if(!trks.length){ statusEl.textContent = 'could not load tracks for that playlist — try another.'; if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'ADD'; } return; }
+    const albumRow = {
+      youtube_playlist_id: result.playlistId, title: result.title, artist: result.channelTitle,
+      artwork_url: result.thumbnail, track_count: trks.length, added_by: libCurrentUser.id
+    };
+    const { data: inserted, error } = await sb.from('albums').insert(albumRow).select().single();
+    if(error){ console.error(error); statusEl.textContent = 'could not save album — check console.'; if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'ADD'; } return; }
+    const trackRows = trks.map(t => ({
+      album_id: inserted.id, youtube_video_id: t.videoId, track_number: t.position + 1,
+      title: t.title, duration_ms: t.duration_ms
+    }));
+    if(trackRows.length){
+      const { error: trackErr } = await sb.from('tracks').insert(trackRows);
+      if(trackErr) console.error(trackErr);
+    }
+    statusEl.textContent = `added "${result.title}" with ${trackRows.length} tracks from YouTube.`;
+    if(btnEl){ btnEl.textContent = 'ADDED ✓'; }
+    await loadLibAlbums();
+  }catch(e){
+    console.error(e);
+    statusEl.textContent = 'import failed — check console.';
+    if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'ADD'; }
+  }
+}
+async function deleteLibAlbum(albumId){
+  if(!confirm('Delete this album and all its tracks? This removes it for everyone.')) return;
+  const { error } = await sb.from('albums').delete().eq('id', albumId);
+  if(error){ console.error(error); alert('could not delete — check console.'); return; }
+  document.getElementById('album-modal').classList.remove('open');
+  await loadLibAlbums();
+}
+
+// ---- playlists ----
+function renderLibPlaylists(){
+  const locked = document.getElementById('playlists-locked');
+  const area = document.getElementById('playlists-area');
+  if(!libCurrentUser){ locked.style.display='block'; area.style.display='none'; return; }
+  locked.style.display='none'; area.style.display='block';
+  const listEl = document.getElementById('playlist-list');
+  if(libPlaylists.length === 0){ listEl.innerHTML = '<div class="empty-note">no playlists yet</div>'; }
+  else {
+    listEl.innerHTML = libPlaylists.map(p=>`
+      <div class="playlist-item" data-playlist-id="${p.id}">
+        <span class="playlist-name">${esc(p.name)}</span>
+        <span class="lib-album-count">${p.playlist_tracks.length}</span>
+        <span class="playlist-del" data-action="del" title="delete playlist">✕</span>
+      </div>`).join('');
+    listEl.querySelectorAll('.playlist-item').forEach(item=>{
+      const id = Number(item.dataset.playlistId);
+      item.addEventListener('click', e=>{
+        if(e.target.dataset.action === 'del'){ e.stopPropagation(); deleteLibPlaylist(id); }
+        else openPlaylistModal(id);
+      });
+    });
+  }
+}
+async function createLibPlaylist(name){
+  const { data, error } = await sb.from('playlists').insert({ user_id: libCurrentUser.id, name }).select().single();
+  if(error){ console.error(error); alert('could not create playlist — check console.'); return null; }
+  await loadLibPlaylists();
+  return data;
+}
+async function deleteLibPlaylist(id){
+  if(!confirm('Delete this playlist?')) return;
+  const { error } = await sb.from('playlists').delete().eq('id', id);
+  if(error){ console.error(error); return; }
+  await loadLibPlaylists();
+}
+async function addTrackToLibPlaylist(playlistId, trackId){
+  const p = libPlaylists.find(x=>x.id===playlistId);
+  const position = p ? p.playlist_tracks.length : 0;
+  const { error } = await sb.from('playlist_tracks').insert({ playlist_id: playlistId, track_id: trackId, position });
+  if(error){ console.error(error); alert('could not add track — check console.'); return; }
+  await loadLibPlaylists();
+}
+async function removeFromLibPlaylist(playlistTrackId, playlistId){
+  const { error } = await sb.from('playlist_tracks').delete().eq('id', playlistTrackId);
+  if(error){ console.error(error); return; }
+  await loadLibPlaylists();
+  openPlaylistModal(playlistId);
+}
+function openPlaylistModal(id){
+  const p = libPlaylists.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById('modal-art').src = '';
+  document.getElementById('modal-title').textContent = p.name;
+  document.getElementById('modal-artist').textContent = `${p.playlist_tracks.length} track(s) · your playlist`;
+  document.getElementById('modal-tags').innerHTML = '';
+  document.getElementById('modal-delete').style.display = 'none';
+  const queueList = p.playlist_tracks.map(pt => ({ ...pt.tracks, _ptId: pt.id, albums: pt.tracks.albums }));
+  const listEl = document.getElementById('modal-tracklist');
+  if(queueList.length === 0){ listEl.innerHTML = '<div class="empty-note">empty — add tracks from any album\'s track list</div>'; }
+  else{
+    listEl.innerHTML = queueList.map(t => mtrackRowHtml(t, {showNum:false, showThumb:true, showArtist:true, removeBtn:true})).join('');
+    listEl.querySelectorAll('.mtrack-row').forEach((row,i)=>{
+      const t = queueList[i];
+      wireMtrackRow(row, t, queueList, { removeBtn:true, onRemove: ()=> removeFromLibPlaylist(t._ptId, id) });
+    });
+  }
+  document.getElementById('modal-play-all').onclick = ()=> playLibQueue(queueList, 0);
+  document.getElementById('album-modal').classList.add('open');
+}
+
+// ---- library playback: feeds the existing YouTube engine. Tracks are imported
+// with a YouTube video id already attached, but we still resolve on the fly as a
+// fallback (e.g. a video was removed after import) ----
+function playLibQueue(queueList, index){
+  const items = queueList.map(t=>{
+    const album = t.albums || t.album || {};
+    return { title:t.title, artist:album.artist||'', thumb:album.artwork_url||'', trackId:t.id, vid:t.youtube_video_id||null };
+  });
+  ytQ = items.map(it=>({ vid: it.vid, pid:null, title:it.title, artist:it.artist, thumb:it.thumb, trackId:it.trackId, resolving:false, failed:false }));
+  document.getElementById('yt-wrap').style.display='block';
+  document.getElementById('yt-empty').style.display='none';
+  renderYtQ();
+  ytLoad(index);
+}
+
+// ---- account handlers ----
+let libIsAdmin = false;
+async function refreshLibAdminStatus(){
+  if(!libCurrentUser){ libIsAdmin = false; return; }
+  const { data, error } = await sb.from('profiles').select('is_admin').eq('id', libCurrentUser.id).single();
+  libIsAdmin = !error && !!(data && data.is_admin);
+}
+function updateLibAccountUI(){
+  const loggedOut = document.getElementById('account-logged-out');
+  const loggedIn = document.getElementById('account-logged-in');
+  const addLocked = document.getElementById('add-album-locked');
+  const addForm = document.getElementById('add-album-form');
+  const adminBadge = document.getElementById('account-admin-badge');
+  if(libCurrentUser){
+    loggedOut.style.display='none'; loggedIn.style.display='block';
+    document.getElementById('account-username-display').textContent = authEmailToUsername(libCurrentUser.email);
+    if(adminBadge) adminBadge.style.display = libIsAdmin ? 'inline-block' : 'none';
+    addLocked.style.display='none'; addForm.style.display='block';
+  } else {
+    loggedOut.style.display='block'; loggedIn.style.display='none';
+    document.getElementById('account-status').textContent='';
+    if(adminBadge) adminBadge.style.display='none';
+    addLocked.style.display='block'; addForm.style.display='none';
+  }
+}
+async function handleLibSignUp(){
+  const username = document.getElementById('account-username').value.trim();
+  const password = document.getElementById('account-password').value;
+  const statusEl = document.getElementById('account-status');
+  if(!username || !password){ statusEl.textContent = 'enter a username and password.'; return; }
+  if(!USERNAME_RE.test(username)){ statusEl.textContent = 'username: 3-20 letters, numbers, or underscores only.'; return; }
+  if(password.length < 6){ statusEl.textContent = 'password must be at least 6 characters.'; return; }
+  statusEl.textContent = 'creating account...';
+  const { data, error } = await sb.auth.signUp({ email: usernameToAuthEmail(username), password });
+  if(error){
+    statusEl.textContent = /already registered|already exists/i.test(error.message) ? 'that username is taken.' : 'error: ' + error.message;
+    return;
+  }
+  statusEl.textContent = data.session ? '' : 'account created — log in below.';
+}
+async function handleLibLogIn(){
+  const username = document.getElementById('account-username').value.trim();
+  const password = document.getElementById('account-password').value;
+  const statusEl = document.getElementById('account-status');
+  if(!username || !password){ statusEl.textContent = 'enter a username and password.'; return; }
+  statusEl.textContent = 'logging in...';
+  const { error } = await sb.auth.signInWithPassword({ email: usernameToAuthEmail(username), password });
+  if(error){
+    statusEl.textContent = /invalid login/i.test(error.message) ? 'wrong username or password.' : 'error: ' + error.message;
+    return;
+  }
+  statusEl.textContent = '';
+}
+async function handleLibLogOut(){ await sb.auth.signOut(); }
+
+document.getElementById('album-search-btn').addEventListener('click', doAlbumSearch);
+document.getElementById('album-search-input').addEventListener('keydown', e=>{ if(e.key==='Enter') doAlbumSearch(); });
+document.getElementById('new-playlist-btn').addEventListener('click', async ()=>{
+  const input = document.getElementById('new-playlist-name');
+  const name = input.value.trim();
+  if(!name) return;
+  await createLibPlaylist(name);
+  input.value = '';
+});
+document.getElementById('account-signup-btn').addEventListener('click', handleLibSignUp);
+document.getElementById('account-login-btn').addEventListener('click', handleLibLogIn);
+document.getElementById('account-logout-btn').addEventListener('click', handleLibLogOut);
+[document.getElementById('account-username'), document.getElementById('account-password')].forEach(el=>{
+  el.addEventListener('keydown', e=>{ if(e.key === 'Enter') handleLibLogIn(); });
+});
+
+(async function initLibrary(){
+  if(!CONFIGURED) return;
+  const { data: { session } } = await sb.auth.getSession();
+  libCurrentUser = session ? session.user : null;
+  await refreshLibAdminStatus();
+  updateLibAccountUI();
+  await loadLibAlbums();
+  await loadLibPlaylists();
+  sb.auth.onAuthStateChange(async (event, session)=>{
+    if(event === 'SIGNED_IN'){ libCurrentUser = session.user; await refreshLibAdminStatus(); updateLibAccountUI(); loadLibPlaylists(); renderLibAlbumList(); }
+    else if(event === 'SIGNED_OUT'){ libCurrentUser = null; libIsAdmin = false; updateLibAccountUI(); loadLibPlaylists(); renderLibAlbumList(); document.getElementById('album-modal').classList.remove('open'); }
+  });
+})();
+
+// ═══════════════════════════════════════════════════════════
+//  VOXEL GRID
+// ═══════════════════════════════════════════════════════════
+let gridW=16,gridH=8,gridD=16,heights=[],targets=[],beatFlash=0,vizMode='bars',rainDrops=[],scatter=[],beatPulseAmt=0;
+
+function initGrid(){
+  gridW=+document.getElementById('grid-wd').value;
+  gridH=+document.getElementById('grid-ht').value;gridD=gridW;
+  const c=gridW*gridD;heights=new Float32Array(c);targets=new Float32Array(c);
+  rainDrops=Array.from({length:c},()=>({y:Math.random()*gridH,spd:.2+Math.random()*.4}));
+  scatter=Array.from({length:80},rndPart);
+  document.getElementById('val-grid').textContent=`${gridW}x${gridH}x${gridD}`;
+}
+function rndPart(){return{x:Math.random()*gridW,y:Math.random()*gridH,z:Math.random()*gridD,vx:(Math.random()-.5)*.1,vy:(Math.random()-.5)*.1,vz:(Math.random()-.5)*.1};}
+
+function updateViz(){
+  if(!hasAudio()){for(let i=0;i<heights.length;i++)heights[i]=Math.max(0,heights[i]*.9);return;}
+  readAudio();
+  if(detectBeat())beatFlash=1.0;beatFlash*=.85;
+  const sens=+document.getElementById('sens').value,len=smoothed.length,half=gridW/2|0;
+  switch(vizMode){
+    case'bars':for(let x=0;x<gridW;x++)for(let z=0;z<gridD;z++){const fi=((x/gridW)*len*.7)|0,fi2=((z/gridD)*len*.3+len*.7)|0;targets[x*gridD+z]=Math.min(1,(smoothed[fi]/255*.7+smoothed[fi2]/255*.3)*sens)*gridH;}break;
+    case'wave':{const t=frame*.05;for(let x=0;x<gridW;x++){const fi=((x/gridW)*len*.8)|0,amp=smoothed[fi]/255*sens;for(let z=0;z<gridD;z++)targets[x*gridD+z]=(Math.sin(z*.4+t+amp*3)*.5+.5)*amp*gridH;}break;}
+    case'ring':{const cx=gridW/2,cz=gridD/2,mr=Math.min(cx,cz);for(let x=0;x<gridW;x++)for(let z=0;z<gridD;z++){const r=Math.sqrt((x-cx)**2+(z-cz)**2),fi=Math.min((r/mr*len*.8)|0,len-1);targets[x*gridD+z]=smoothed[fi]/255*sens*gridH;}break;}
+    case'rain':{const en=band(0,.5)*sens;for(let x=0;x<gridW;x++)for(let z=0;z<gridD;z++){const i=x*gridD+z;rainDrops[i].spd=.1+en*.8;rainDrops[i].y-=rainDrops[i].spd;if(rainDrops[i].y<0)rainDrops[i].y=gridH+Math.random()*4;targets[i]=Math.max(0,Math.min(gridH,rainDrops[i].y));}break;}
+    case'tunnel':{const t=frame*.03,bs=band(0,.15)*sens;for(let x=0;x<gridW;x++)for(let z=0;z<gridD;z++){const nx=(x-gridW/2)/gridW*2,nz=(z-gridD/2)/gridD*2,r=Math.sqrt(nx*nx+nz*nz),a=Math.atan2(nz,nx),fi=Math.min((((a/Math.PI+1)/2)*len*.8)|0,len-1);targets[x*gridD+z]=(Math.sin(r*8-t*4+bs*6)*.5+.5)*smoothed[fi]/255*sens*gridH;}break;}
+    case'scatter':{const en=band(0,1)*sens;scatter.forEach(p=>{p.x+=p.vx*(1+en*3);p.y+=p.vy*(1+en*2);p.z+=p.vz*(1+en*3);if(p.x<0||p.x>=gridW||p.y<0||p.y>=gridH||p.z<0||p.z>=gridD)Object.assign(p,rndPart());});for(let i=0;i<targets.length;i++)targets[i]*=.85;scatter.forEach(p=>{const ix=p.x|0,iz=p.z|0;if(ix>=0&&ix<gridW&&iz>=0&&iz<gridD)targets[ix*gridD+iz]=Math.max(targets[ix*gridD+iz],p.y);});break;}
+    case'mirror':for(let x=0;x<half;x++)for(let z=0;z<gridD;z++){const fi=Math.min(((x/half)*(z/gridD)*len*.8)|0,len-1),v=smoothed[fi]/255*sens;targets[x*gridD+z]=v*gridH;targets[(gridW-1-x)*gridD+z]=v*gridH;}break;
+    case'pyramid':{const cx=gridW/2,cz=gridD/2,b=band(0,.15)*sens,m=band(.15,.5)*sens,tr=band(.5,1)*sens;for(let x=0;x<gridW;x++)for(let z=0;z<gridD;z++){const d=Math.max(Math.abs(x-cx)/cx,Math.abs(z-cz)/cz);targets[x*gridD+z]=(1-d)*b*gridH*.6+d*tr*gridH*.4+m*gridH*.3;}break;}
+    case'spiral':{const cx=gridW/2,cz=gridD/2,t=frame*.04;for(let x=0;x<gridW;x++)for(let z=0;z<gridD;z++){const dx=x-cx,dz=z-cz,r=Math.sqrt(dx*dx+dz*dz)/(Math.min(gridW,gridD)*.5),sp=(Math.atan2(dz,dx)+r*4-t*2)%(Math.PI*2),fi=Math.min((r*len*.75)|0,len-1);targets[x*gridD+z]=(Math.sin(sp*3)*.5+.5)*smoothed[fi]/255*sens*gridH;}break;}
+    case'volcano':{const cx=gridW/2,cz=gridD/2,mr=Math.min(cx,cz),bs=band(0,.15)*sens,t=frame*.06;for(let x=0;x<gridW;x++)for(let z=0;z<gridD;z++){const dx=x-cx,dz=z-cz,r=Math.sqrt(dx*dx+dz*dz)/mr,fi=Math.min(((1-Math.min(r,1))*len*.6)|0,len-1),v=smoothed[fi]/255*sens;targets[x*gridD+z]=((r<.25?(0.25-r)*4*bs:(1-r)*v)+Math.max(0,Math.sin(r*6-t)*.5+.5)*v*.5)*gridH;}break;}
+    case'dna':{const t=frame*.05;for(let x=0;x<gridW;x++){const fi=Math.min(((x/gridW)*len*.8)|0,len-1),v=smoothed[fi]/255*sens;for(let z=0;z<gridD;z++){const t1=Math.sin((x/gridW)*Math.PI*4+t)*(gridD*.35)+gridD*.5,t2=Math.sin((x/gridW)*Math.PI*4+t+Math.PI)*(gridD*.35)+gridD*.5,st=Math.max(0,1-Math.min(Math.abs(z-t1),Math.abs(z-t2))*.5)*v,rp=((x/gridW)*4+t*.5)%1,rng=rp<.15?(1-Math.abs(z-gridD*.5)/(gridD*.5))*.4*v:0;targets[x*gridD+z]=(st+rng)*gridH;}}break;}
+    case'shockwave':{const cx=gridW/2,cz=gridD/2,b=band(0,.12)*sens,m=band(.12,.5)*sens,t=frame*.08;for(let x=0;x<gridW;x++)for(let z=0;z<gridD;z++){const r=Math.sqrt((x-cx)**2+(z-cz)**2);targets[x*gridD+z]=(Math.max(0,Math.sin(r*1.2-t*4)*b)+Math.max(0,Math.sin(r*.8-t*3+1.5)*m*.7)+Math.max(0,Math.cos(r*1.6-t*5+.8)*b*.5))*gridH;}break;}
+  }
+  const lr=.12+band(0,.1)*.15;
+  for(let i=0;i<heights.length;i++){heights[i]+=(targets[i]-heights[i])*lr;heights[i]=Math.max(0,Math.min(gridH,heights[i]));}
+
+  const bs=band(0,.15),md=band(.15,.5),tr=band(.5,1);
+  document.getElementById('hud-bass').textContent=Math.round(bs*100);
+  document.getElementById('hud-mid').textContent=Math.round(md*100);
+  document.getElementById('hud-treble').textContent=Math.round(tr*100);
+  document.getElementById('hud-peak').textContent=Math.round(Math.max(bs,md,tr)*100);
+  document.getElementById('h-bpm').textContent=(usingSimulated?'~':'')+(bpm||'—');
+  document.getElementById('h-bass').textContent=Math.round(bs*100);
+  document.getElementById('h-treble').textContent=Math.round(tr*100);
+  const bars=document.getElementById('eq-bars');
+  if(bars.children.length<24){bars.innerHTML='';for(let i=0;i<24;i++){const e=document.createElement('div');e.className='eq-bar';bars.appendChild(e);}}
+  for(let i=0;i<24;i++){const fi=((i/24)*smoothed.length*.8)|0,h=Math.round(smoothed[fi]/255*24);bars.children[i].style.height=Math.max(2,h)+'px';bars.children[i].style.background=`rgb(${getColor(h/24).join()})`;}
+}
+
+// ═══════════════════════════════════════════════════════════
+//  VOXEL RENDERER (2D Canvas / isometric)
+// ═══════════════════════════════════════════════════════════
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+let view={rotX:-.45,rotY:.6,zoom:1,panX:0,panY:0},drag=null,lastT=0;
+
+function resizeCvs(){
+  const dpr=window.devicePixelRatio||1,r=canvas.parentElement.getBoundingClientRect();
+  canvas.width=r.width*dpr;canvas.height=r.height*dpr;
+  canvas.style.width=r.width+'px';canvas.style.height=r.height+'px';
+  ctx.scale(dpr,dpr);
+}
+window.addEventListener('resize',resizeCvs);resizeCvs();
+
+function rotVec(x,y,z,rx,ry){
+  const cy=Math.cos(ry),sy=Math.sin(ry),x2=x*cy+z*sy,z2=-x*sy+z*cy;
+  const cx=Math.cos(rx),sx=Math.sin(rx);
+  return[x2,y*cx-z2*sx,y*sx+z2*cx];
+}
+function proj(px,py,pz,W,H){const fov=500*view.zoom,z=pz+14,s=fov/Math.max(z,.1);return[W/2+px*s+view.panX,H/2-py*s+view.panY];}
+function shade(rgb,f){return`rgb(${rgb[0]*f|0},${rgb[1]*f|0},${rgb[2]*f|0})`;}
+
+function renderFrame(ts){
+  requestAnimationFrame(renderFrame);
+  const dt=Math.min(.1,(ts-lastT)/1000);lastT=ts;frame++;
+  if(document.getElementById('auto-rot').checked)view.rotY+=dt*+document.getElementById('rot-spd').value;
+  updateViz();
+
+  const W=canvas.width/(window.devicePixelRatio||1),H=canvas.height/(window.devicePixelRatio||1);
+  if(document.getElementById('rainbow-bg').checked){
+    const t=frame*.003,g=ctx.createLinearGradient(0,0,W,H);
+    for(let i=0;i<=6;i++)g.addColorStop(i/6,`hsla(${((i/6+t)%1)*360},70%,12%,1)`);
+    ctx.fillStyle=g;
+  }else ctx.fillStyle=document.getElementById('col-bg').value;
+  ctx.fillRect(0,0,W,H);
+
+  if(!tracks.length&&!micActive)return;
+  const beatBoost=document.getElementById('beat-pulse').checked?beatFlash*.5:0;
+  const cxg=gridW/2,cyg=0,czg=gridD/2,scale=Math.min(W,H)/(Math.max(gridW,gridH,gridD)*3.5)*view.zoom;
+  const vs=Math.max(2,Math.round(scale*12*.7));
+  const voxels=[];
+
+  for(let x=0;x<gridW;x++)for(let z=0;z<gridD;z++){
+    const h=Math.ceil(heights[x*gridD+z]);
+    for(let y=0;y<h;y++){
+      const yt=y/gridH,rgb=getColor(yt,beatBoost*(1-yt)),rv=rotVec(x-cxg,y-cyg,z-czg,view.rotX,view.rotY);
+      const[sx,sy]=proj(rv[0]*scale*.9,rv[1]*scale*.9,rv[2]*scale*.9,W,H);
+      const fog=Math.max(.2,Math.min(1,1-rv[2]/(Math.max(gridW,gridD)*scale*1.2)));
+      voxels.push({sx,sy,depth:rv[2],rgb,fog});
+    }
+    if(document.getElementById('show-floor').checked){
+      const rv=rotVec(x-cxg,-.5,z-czg,view.rotX,view.rotY);
+      const[sx,sy]=proj(rv[0]*scale*.9,rv[1]*scale*.9,rv[2]*scale*.9,W,H);
+      voxels.push({sx,sy,depth:rv[2]+.001,isFloor:true});
+    }
+  }
+  voxels.sort((a,b)=>a.depth-b.depth);
+  for(const v of voxels){
+    if(v.isFloor){ctx.fillStyle='rgba(40,60,30,0.3)';ctx.fillRect(v.sx-vs/2,v.sy-vs/4,vs,vs/2);continue;}
+    const fr=[v.rgb[0]*v.fog|0,v.rgb[1]*v.fog|0,v.rgb[2]*v.fog|0];
+    ctx.fillStyle=shade(fr,1);ctx.fillRect(v.sx-vs/2,v.sy-vs/2,vs,vs);
+    if(vs>3){const sh=Math.max(2,vs*.35|0);ctx.fillStyle=shade(fr,.55);ctx.fillRect(v.sx-vs/2,v.sy+vs/2-1,vs*.45|0,sh);ctx.fillStyle=shade(fr,.72);ctx.fillRect(v.sx+vs/2-(vs*.45|0),v.sy+vs/2-1,vs*.45|0,sh);}
+    if(vs>4){ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=.5;ctx.strokeRect(v.sx-vs/2,v.sy-vs/2,vs,vs);}
+  }
+
+  if(document.getElementById('use-glow').checked&&hasAudio()){
+    const bs=band(0,.15),md=band(.15,.5),en=bs*.7+md*.3+beatBoost*.4;
+    if(en>.03){
+      const gc=getColor(.75+beatBoost*.25,0),gl=+document.getElementById('glow-level').value;
+      const rad=Math.min(W,H)*(.35+en*.3),al=Math.min(gl,en*gl*1.3);
+      const g=ctx.createRadialGradient(W/2+view.panX,H/2+view.panY,0,W/2+view.panX,H/2+view.panY,rad);
+      g.addColorStop(0,`rgba(${gc[0]},${gc[1]},${gc[2]},${al.toFixed(3)})`);
+      g.addColorStop(.5,`rgba(${gc[0]},${gc[1]},${gc[2]},${(al*.3).toFixed(3)})`);
+      g.addColorStop(1,`rgba(${gc[0]},${gc[1]},${gc[2]},0)`);
+      ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  THREE.JS 3D MODEL VISUALIZER
+// ═══════════════════════════════════════════════════════════
+let threeR=null,threeS=null,threeC=null,modelRoot=null,modelMeshes=[];
+let mRotY=0;
+
+function initThree(){
+  if(threeR)return;
+  const tc=document.getElementById('three-canvas'),wrap=tc.parentElement;
+  threeS=new THREE.Scene();
+  threeC=new THREE.PerspectiveCamera(50,wrap.clientWidth/wrap.clientHeight,.01,500);
+  threeC.position.set(0,0,4);
+  threeR=new THREE.WebGLRenderer({canvas:tc,alpha:true,antialias:true});
+  threeR.setPixelRatio(window.devicePixelRatio||1);
+  threeR.setSize(wrap.clientWidth,wrap.clientHeight);
+  threeR.setClearColor(0,0);
+  threeS.add(new THREE.AmbientLight(0xffffff,.15));
+  const mkLight=(col,i,x,y,z)=>{const l=new THREE.PointLight(col,i,25);l.position.set(x,y,z);threeS.add(l);return l;};
+  threeS.userData.kl1=mkLight(0xaaff44,2.5,3,5,4);
+  threeS.userData.kl2=mkLight(0xff4466,1.8,-3,-2,-3);
+  threeS.userData.kl3=mkLight(0x44aaff,1.2,0,-4,2);
+  window.addEventListener('resize',()=>{
+    const w=wrap.clientWidth,h=wrap.clientHeight;
+    threeC.aspect=w/h;threeC.updateProjectionMatrix();threeR.setSize(w,h);
+  });
+  threeLoop();
+}
+
+function threeLoop(){
+  requestAnimationFrame(threeLoop);
+  if(!threeR||!modelRoot||!document.getElementById('show-model').checked){if(threeR)threeR.render(threeS,threeC);return;}
+  const bs=hasAudio()?band(0,.15):0,md=hasAudio()?band(.15,.5):0,tr=hasAudio()?band(.5,1):0;
+  const rotSpd=+document.getElementById('rot-spd').value;
+  mRotY+=(0.005+bs*.012+md*.006)*(rotSpd*.5+.5);
+  modelRoot.rotation.y=mRotY;
+  modelRoot.rotation.x=Math.sin(frame*.008)*.15+bs*.22;
+  const pulse=1+beatFlash*.18,mscale=+document.getElementById('model-size').value;
+  modelRoot.scale.setScalar(mscale*pulse);
+
+  const kl1=threeS.userData.kl1,kl2=threeS.userData.kl2,kl3=threeS.userData.kl3;
+  if(kl1){kl1.intensity=1.8+bs*4+beatFlash*2.5;kl1.position.x=Math.cos(frame*.012)*4;kl1.position.z=Math.sin(frame*.012)*4;}
+  if(kl2){kl2.intensity=1.2+md*2.5+beatFlash*1.2;kl2.position.x=Math.cos(frame*.012+Math.PI)*4;kl2.position.z=Math.sin(frame*.012+Math.PI)*4;}
+  if(kl3)kl3.intensity=0.8+tr*2;
+
+  const em=+document.getElementById('emissive-amt').value;
+  modelMeshes.forEach(mesh=>{
+    if(!mesh.material)return;
+    const beat=Math.min(1,bs+beatFlash*.4);
+    const s=SCHEMES[activeScheme];
+    if(s.rainbow){
+      const h=((frame*.004+beat*.3)%1)*360;
+      mesh.material.color.setHSL(h/360,.95,.4+beat*.25);
+      mesh.material.emissive.setHSL(h/360,.8,em*beat*.5);
+    }else{
+      const lo=s.lo||hexToRgb(document.getElementById('col-lo').value);
+      const hi=s.hi||hexToRgb(document.getElementById('col-hi').value);
+      const t=Math.min(1,beat+tr*.2);
+      mesh.material.color.setRGB((lo[0]+(hi[0]-lo[0])*t)/255,(lo[1]+(hi[1]-lo[1])*t)/255,(lo[2]+(hi[2]-lo[2])*t)/255);
+      mesh.material.emissive.setRGB(lo[0]/255*beat*em*.5,lo[1]/255*beat*em*.5,lo[2]/255*beat*em*.5);
+    }
+  });
+
+  const dist=+document.getElementById('distort-amt').value;
+  if(dist>.001&&hasAudio())modelMeshes.forEach(m=>distortMesh(m,dist));
+
+  threeR.render(threeS,threeC);
+}
+
+function distortMesh(mesh,amt){
+  const geo=mesh.geometry;if(!geo||!geo.userData.orig)return;
+  const orig=geo.userData.orig,pos=geo.attributes.position,nrm=geo.attributes.normal,cnt=pos.count;
+  for(let i=0;i<cnt;i++){
+    const fi=Math.min((i/cnt*smoothed.length*.85)|0,smoothed.length-1);
+    const a=smoothed[fi]/255,disp=a*amt*(.2+beatFlash*.8);
+    let nx,ny,nz;
+    if(nrm){nx=nrm.getX(i);ny=nrm.getY(i);nz=nrm.getZ(i);}
+    else{const l=Math.sqrt(orig[i*3]**2+orig[i*3+1]**2+orig[i*3+2]**2)||1;nx=orig[i*3]/l;ny=orig[i*3+1]/l;nz=orig[i*3+2]/l;}
+    pos.setXYZ(i,orig[i*3]+nx*disp,orig[i*3+1]+ny*disp,orig[i*3+2]+nz*disp);
+  }
+  pos.needsUpdate=true;
+  if(amt>.4)geo.computeVertexNormals();
+}
+
+function onModelLoaded(obj,fname){
+  const box=new THREE.Box3().setFromObject(obj);
+  const ctr=box.getCenter(new THREE.Vector3());
+  const sz=box.getSize(new THREE.Vector3());
+  obj.position.sub(ctr);
+  obj.scale.multiplyScalar(2.4/Math.max(sz.x,sz.y,sz.z)||1);
+  if(modelRoot)threeS.remove(modelRoot);
+  modelRoot=new THREE.Group();modelRoot.add(obj);threeS.add(modelRoot);
+  modelMeshes=[];
+  obj.traverse(c=>{
+    if(!c.isMesh)return;
+    const geo=c.geometry;
+    if(!geo.attributes.normal)geo.computeVertexNormals();
+    geo.userData.orig=new Float32Array(geo.attributes.position.array);
+    c.material=new THREE.MeshPhongMaterial({color:0xaaff44,emissive:0x112200,shininess:80,side:THREE.DoubleSide,transparent:true,opacity:+document.getElementById('model-opacity').value});
+    modelMeshes.push(c);
+  });
+  if(!modelMeshes.length){alert('No meshes found in model.');threeS.remove(modelRoot);modelRoot=null;return;}
+  document.getElementById('model-ctrl').style.display='block';
+  document.getElementById('three-canvas').style.display='block';
+  document.getElementById('model-info').style.display='block';
+  document.getElementById('model-info').textContent=`✓ ${fname} (${modelMeshes.length} mesh${modelMeshes.length>1?'es':''})`;
+  document.getElementById('model-hud').style.display='block';
+  document.getElementById('model-hud-name').textContent=fname;
+  updateWire();
+}
+
+function loadModel(file){
+  if(!threeR)initThree();
+  const url=URL.createObjectURL(file),ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='glb'||ext==='gltf'){
+    if(!THREE.GLTFLoader){alert('GLTFLoader not available. Check internet connection.');return;}
+    new THREE.GLTFLoader().load(url,g=>onModelLoaded(g.scene,file.name),null,()=>alert('Failed to load GLTF.'));
+  }else if(ext==='obj'){
+    if(!THREE.OBJLoader){alert('OBJLoader not available. Check internet connection.');return;}
+    new THREE.OBJLoader().load(url,o=>onModelLoaded(o,file.name),null,()=>alert('Failed to load OBJ.'));
+  }else alert('Unsupported. Use .obj, .glb, or .gltf');
+}
+
+function removeModel(){
+  if(modelRoot){threeS.remove(modelRoot);modelRoot=null;}modelMeshes=[];
+  document.getElementById('three-canvas').style.display='none';
+  document.getElementById('model-ctrl').style.display='none';
+  document.getElementById('model-info').style.display='none';
+  document.getElementById('model-hud').style.display='none';
+}
+
+function updateWire(){const w=document.getElementById('model-wire').checked;modelMeshes.forEach(m=>{if(m.material)m.material.wireframe=w;});}
+function updateOpacity(v){document.getElementById('val-mopacity').textContent=(+v).toFixed(1);modelMeshes.forEach(m=>{if(m.material)m.material.opacity=+v;});}
+function toggleModelVis(){
+  const show=document.getElementById('show-model').checked;
+  document.getElementById('three-canvas').style.display=(show&&modelRoot)?'block':'none';
+}
+
+const mdz=document.getElementById('model-dz');
+document.getElementById('model-input').addEventListener('change',e=>{if(e.target.files[0])loadModel(e.target.files[0]);});
+mdz.addEventListener('dragover',e=>{e.preventDefault();mdz.classList.add('drag-over');});
+mdz.addEventListener('dragleave',()=>mdz.classList.remove('drag-over'));
+mdz.addEventListener('drop',e=>{e.preventDefault();mdz.classList.remove('drag-over');if(e.dataTransfer.files[0])loadModel(e.dataTransfer.files[0]);});
+document.getElementById('remove-model-btn').addEventListener('click',removeModel);
+document.getElementById('show-model').addEventListener('change',toggleModelVis);
+document.getElementById('model-wire').addEventListener('change',updateWire);
+document.getElementById('model-opacity').addEventListener('input',e=>{updateOpacity(e.target.value);});
+document.getElementById('distort-amt').addEventListener('input',e=>{document.getElementById('val-distort').textContent=(+e.target.value).toFixed(2);});
+document.getElementById('model-size').addEventListener('input',e=>{document.getElementById('val-mscale').textContent=(+e.target.value).toFixed(1);});
+document.getElementById('emissive-amt').addEventListener('input',e=>{document.getElementById('val-emissive').textContent=(+e.target.value).toFixed(1);});
+
+// ═══════════════════════════════════════════════════════════
+//  MOUSE CONTROLS
+// ═══════════════════════════════════════════════════════════
+canvas.addEventListener('mousedown',e=>{drag={x:e.clientX,y:e.clientY,btn:e.button,rx:view.rotX,ry:view.rotY,px:view.panX,py:view.panY};});
+canvas.addEventListener('mousemove',e=>{
+  if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+  if(drag.btn===2){view.panX=drag.px+dx;view.panY=drag.py+dy;}
+  else{view.rotY=drag.ry+dx*.006;view.rotX=drag.rx+dy*.006;}
+});
+canvas.addEventListener('mouseup',()=>drag=null);
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('wheel',e=>{e.preventDefault();view.zoom*=e.deltaY>0?.93:1.07;view.zoom=Math.max(.1,Math.min(8,view.zoom));},{passive:false});
+
+// ═══════════════════════════════════════════════════════════
+//  UI BINDINGS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('grid-wd').addEventListener('input',e=>{document.getElementById('val-wd').textContent=e.target.value;initGrid();});
+document.getElementById('grid-ht').addEventListener('input',e=>{document.getElementById('val-ht').textContent=e.target.value;initGrid();});
+document.getElementById('sens').addEventListener('input',e=>{document.getElementById('val-sens').textContent=(+e.target.value).toFixed(1);});
+document.getElementById('smooth').addEventListener('input',e=>{document.getElementById('val-smooth').textContent=(+e.target.value).toFixed(2);});
+document.getElementById('rot-spd').addEventListener('input',e=>{document.getElementById('val-rotspd').textContent=(+e.target.value).toFixed(1);});
+document.getElementById('glow-level').addEventListener('input',e=>{document.getElementById('val-glow').textContent=(+e.target.value).toFixed(2);});
+document.querySelectorAll('[data-viz]').forEach(b=>b.addEventListener('click',()=>{vizMode=b.dataset.viz;document.querySelectorAll('[data-viz]').forEach(x=>x.classList.remove('active'));b.classList.add('active');}));
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+buildSchemeGrid();
+initGrid();
+requestAnimationFrame(renderFrame);
+
+</script>
+<script>
+
+// ═══════════════════════════════════════════════════════════
+//  SHELL UI — rail collapse, page nav, now-playing overlay
+//  (added on top of the original app; the original functions
+//  above are untouched — a couple are intentionally redefined
+//  below so the new layout stays in sync with them)
+// ═══════════════════════════════════════════════════════════
+(function(){
+  const rail=document.getElementById('rail');
+  document.getElementById('rail-toggle').addEventListener('click',()=>rail.classList.toggle('collapsed'));
+
+  const pages=document.querySelectorAll('.page');
+  const railItems=document.querySelectorAll('.rail-item[data-page]');
+  function showPage(id){
+    pages.forEach(p=>p.classList.toggle('active',p.id==='page-'+id));
+    railItems.forEach(b=>b.classList.toggle('active',b.dataset.page===id));
+  }
+  railItems.forEach(b=>b.addEventListener('click',()=>{showPage(b.dataset.page);closeNowPlaying();}));
+
+  const overlay=document.getElementById('now-playing-overlay');
+  const expandBtn=document.getElementById('pb-expand');
+  const npSettings=document.getElementById('np-settings');
+  window.openNowPlaying=function(){
+    overlay.classList.add('open');expandBtn.classList.add('active');expandBtn.textContent='▼ Browse';
+    // canvas-wrap is display:none until the overlay opens, so the canvas
+    // was sized 0x0 on page load — force a real resize now that it's visible.
+    if(typeof resizeCvs==='function')resizeCvs();
+    window.dispatchEvent(new Event('resize')); // also resizes the three.js renderer if a 3D model is loaded
+  };
+  window.closeNowPlaying=function(){overlay.classList.remove('open');expandBtn.classList.remove('active');expandBtn.textContent='▲ Visualizer';};
+  expandBtn.addEventListener('click',()=>{overlay.classList.contains('open')?closeNowPlaying():openNowPlaying();});
+  document.getElementById('np-close').addEventListener('click',closeNowPlaying);
+  const npToggle=document.getElementById('np-settings-toggle');
+  if(npToggle)npToggle.addEventListener('click',()=>npSettings.classList.toggle('open'));
+})();
+
+// Auto-open the visualizer whenever something actually starts playing
+// (keeps the original empty-state/HUD toggling, just also surfaces the
+// full-screen "Now Playing" view — like tapping a song in YouTube Music).
+function showHUD(){
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('hud').style.display='block';
+  if(typeof openNowPlaying==='function')openNowPlaying();
+}
+
+// Render the Home page as an album-art grid instead of a text list.
+function renderLibAlbumList(){
+  const grid=document.getElementById('home-album-grid');
+  if(!grid)return;
+  if(!CONFIGURED){ grid.innerHTML='<div class="empty-note">connect Supabase to load your library — see README.md</div>'; return; }
+  const q=(libSearchTerm||'').toLowerCase();
+  const list=libAlbums.filter(a=>!q||a.title.toLowerCase().includes(q)||a.artist.toLowerCase().includes(q));
+  if(list.length===0){ grid.innerHTML='<div class="empty-note">no albums yet — use "Add Album" in the menu to search YouTube</div>'; return; }
+  grid.innerHTML=list.map(a=>`
+    <div class="album-card${libActiveAlbumId===a.id?' active':''}" data-album-id="${a.id}">
+      <div class="ac-art-wrap">
+        <img src="${escAttr(a.artwork_url||'')}" loading="lazy">
+        <div class="ac-play"><span>▶</span></div>
+      </div>
+      <div class="ac-title">${esc(a.title)}</div>
+      <div class="ac-artist">${esc(a.artist)}</div>
+    </div>`).join('');
+  grid.querySelectorAll('.album-card').forEach(card=>{
+    card.addEventListener('click',()=>openAlbumModal(Number(card.dataset.albumId)));
+  });
+}
+
+</script>
+</body>
+</html>
