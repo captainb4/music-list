@@ -71,6 +71,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 .ttrack::after{content:'';position:absolute;width:10px;height:10px;background:var(--bg);top:4px;left:4px;transition:transform .15s}
 .toggle input:checked+.ttrack::after{transform:translateX(14px)}
 .color-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.subtab-nav{display:flex;gap:4px;margin-bottom:12px}
+.subtab-btn{flex:1;padding:7px 4px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'VT323',monospace;font-size:14px;letter-spacing:1px;cursor:pointer;text-align:center;border-radius:2px;transition:all .1s}
+.subtab-btn:hover{border-color:var(--accent);color:var(--accent)}
+.subtab-btn.active{border-color:var(--accent);background:rgba(170,255,68,.12);color:var(--accent)}
+.subtab-pane{display:none}
+.subtab-pane.active{display:block}
 input[type=color]{-webkit-appearance:none;width:32px;height:22px;border:1px solid var(--border);background:none;cursor:pointer;padding:1px}
 input[type=color]::-webkit-color-swatch-wrapper{padding:0}input[type=color]::-webkit-color-swatch{border:none}
 .canvas-wrap{position:relative;overflow:hidden;background:var(--bg)}
@@ -437,34 +443,40 @@ header{flex:0 0 auto}
           <div class="hint-bar">drag → rotate &nbsp;|&nbsp; scroll → zoom &nbsp;|&nbsp; right-drag → pan</div>
         </div>
         <aside class="np-settings" id="np-settings">
-          <!-- VOXEL GRID -->
+          <!-- VIZ MODE / COLORS / VOXEL GRID — tabbed together -->
           <div class="panel">
-            <div class="panel-title">Voxel Grid</div>
-            <div class="control"><div class="ctrl-row"><span class="ctrl-label">Grid Size</span><span class="ctrl-val" id="val-grid">16×8×16</span></div></div>
-            <div class="control"><div class="ctrl-row"><span class="ctrl-label">Width/Depth</span><span class="ctrl-val" id="val-wd">16</span></div><input type="range" id="grid-wd" min="4" max="32" value="16" step="2"></div>
-            <div class="control"><div class="ctrl-row"><span class="ctrl-label">Max Height</span><span class="ctrl-val" id="val-ht">8</span></div><input type="range" id="grid-ht" min="4" max="32" value="8" step="1"></div>
-            <div class="control"><div class="ctrl-row"><span class="ctrl-label">Sensitivity</span><span class="ctrl-val" id="val-sens">1.0</span></div><input type="range" id="sens" min="0.5" max="4" value="1.0" step="0.1"></div>
-            <div class="control"><div class="ctrl-row"><span class="ctrl-label">Smoothing</span><span class="ctrl-val" id="val-smooth">0.85</span></div><input type="range" id="smooth" min="0.1" max="0.97" value="0.85" step="0.01"></div>
-          </div>
-          <!-- VIZ MODE -->
-          <div class="panel">
-            <div class="panel-title">Viz Mode</div>
-            <div class="btn-grid">
-              <button class="px-btn active" data-viz="bars">EQ Bars</button><button class="px-btn" data-viz="wave">Wave</button>
-              <button class="px-btn" data-viz="ring">Ring</button><button class="px-btn" data-viz="rain">Rain</button>
-              <button class="px-btn" data-viz="tunnel">Tunnel</button><button class="px-btn" data-viz="scatter">Scatter</button>
-              <button class="px-btn" data-viz="mirror">Mirror</button><button class="px-btn" data-viz="pyramid">Pyramid</button>
-              <button class="px-btn" data-viz="spiral">Spiral</button><button class="px-btn" data-viz="volcano">Volcano</button>
-              <button class="px-btn" data-viz="dna">DNA</button><button class="px-btn" data-viz="shockwave">Shockwave</button>
+            <div class="subtab-nav">
+              <button class="subtab-btn active" data-subtab="vizmode">Viz Mode</button>
+              <button class="subtab-btn" data-subtab="colors">Colors</button>
+              <button class="subtab-btn" data-subtab="voxelgrid">Voxel Grid</button>
             </div>
-          </div>
-          <!-- COLOR -->
-          <div class="panel">
-            <div class="panel-title">Color Scheme</div>
-            <div class="scheme-grid" id="scheme-grid"></div>
-            <div style="margin-top:10px">
-              <div class="color-row"><span class="ctrl-label">Custom Low</span><input type="color" id="col-lo" value="#44aaff"></div>
-              <div class="color-row"><span class="ctrl-label">Custom High</span><input type="color" id="col-hi" value="#ff4466"></div>
+
+            <div class="subtab-pane active" data-subpane="vizmode">
+              <div class="btn-grid">
+                <button class="px-btn active" data-viz="bars">EQ Bars</button><button class="px-btn" data-viz="wave">Wave</button>
+                <button class="px-btn" data-viz="ring">Ring</button><button class="px-btn" data-viz="rain">Rain</button>
+                <button class="px-btn" data-viz="tunnel">Tunnel</button><button class="px-btn" data-viz="scatter">Scatter</button>
+                <button class="px-btn" data-viz="mirror">Mirror</button><button class="px-btn" data-viz="pyramid">Pyramid</button>
+                <button class="px-btn" data-viz="spiral">Spiral</button><button class="px-btn" data-viz="volcano">Volcano</button>
+                <button class="px-btn" data-viz="dna">DNA</button><button class="px-btn" data-viz="shockwave">Shockwave</button>
+              </div>
+            </div>
+
+            <div class="subtab-pane" data-subpane="colors">
+              <div class="scheme-grid" id="scheme-grid"></div>
+              <div style="margin-top:10px">
+                <div class="color-row"><span class="ctrl-label">Custom Low</span><input type="color" id="col-lo" value="#44aaff"></div>
+                <div class="color-row"><span class="ctrl-label">Custom High</span><input type="color" id="col-hi" value="#ff4466"></div>
+              </div>
+            </div>
+
+            <div class="subtab-pane" data-subpane="voxelgrid">
+              <div class="toggle-row"><span class="ctrl-label">Show Voxel Grid</span><label class="toggle"><input type="checkbox" id="show-voxels" checked><div class="ttrack"></div></label></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Grid Size</span><span class="ctrl-val" id="val-grid">16×8×16</span></div></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Width/Depth</span><span class="ctrl-val" id="val-wd">16</span></div><input type="range" id="grid-wd" min="4" max="32" value="16" step="2"></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Max Height</span><span class="ctrl-val" id="val-ht">8</span></div><input type="range" id="grid-ht" min="4" max="32" value="8" step="1"></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Sensitivity</span><span class="ctrl-val" id="val-sens">1.0</span></div><input type="range" id="sens" min="0.5" max="4" value="1.0" step="0.1"></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Smoothing</span><span class="ctrl-val" id="val-smooth">0.85</span></div><input type="range" id="smooth" min="0.1" max="0.97" value="0.85" step="0.01"></div>
             </div>
           </div>
           <!-- PRESETS FOR THE CURRENT ALBUM/PLAYLIST (account-based, shareable) -->
@@ -788,7 +800,13 @@ audio.addEventListener('ended',()=>{if(loop){audio.currentTime=0;audio.play();}e
 audio.addEventListener('loadedmetadata',()=>{if(curTrack>=0){tracks[curTrack].dur=audio.duration;renderPL();}});
 
 document.getElementById('progress-wrap').addEventListener('click',e=>{
-  const r=e.currentTarget.getBoundingClientRect();if(audio.duration)audio.currentTime=((e.clientX-r.left)/r.width)*audio.duration;
+  const r=e.currentTarget.getBoundingClientRect();
+  const frac=(e.clientX-r.left)/r.width;
+  if(activeEngine==='yt'&&ytPlayer&&ytReady){
+    try{ const dur=ytPlayer.getDuration(); if(isFinite(dur)&&dur>0)ytPlayer.seekTo(frac*dur,true); }catch(e){}
+  } else if(audio.duration){
+    audio.currentTime=frac*audio.duration;
+  }
 });
 document.getElementById('btn-play').addEventListener('click',()=>{
   if(activeEngine==='yt'&&ytPlayer&&ytReady){
@@ -800,7 +818,12 @@ document.getElementById('btn-next').addEventListener('click',()=>{ if(activeEngi
 document.getElementById('btn-prev').addEventListener('click',()=>{ if(activeEngine==='yt')ytPrev();else prevTrack(); });
 document.getElementById('btn-shuffle').addEventListener('click',function(){shuffle=!shuffle;this.classList.toggle('active',shuffle);});
 document.getElementById('btn-loop').addEventListener('click',function(){loop=!loop;this.classList.toggle('active',loop);});
-document.getElementById('vol').addEventListener('input',e=>{audio.volume=+e.target.value;document.getElementById('vol-val').textContent=Math.round(+e.target.value*100)+'%';});
+document.getElementById('vol').addEventListener('input',e=>{
+  const v=+e.target.value;
+  audio.volume=v;
+  if(ytPlayer&&ytReady){try{ytPlayer.setVolume(v*100);}catch(e){}}
+  document.getElementById('vol-val').textContent=Math.round(v*100)+'%';
+});
 
 const dz=document.getElementById('dropzone');
 document.getElementById('file-input').addEventListener('change',e=>addTracks(e.target.files));
@@ -820,7 +843,11 @@ window.onYouTubeIframeAPIReady=function(){
     height:'100%',width:'100%',videoId:'',
     playerVars:{autoplay:0,controls:1,rel:0,modestbranding:1},
     events:{
-      onReady(){ytReady=true;if(ytPendingLoad){const p=ytPendingLoad;ytPendingLoad=null;p();}},
+      onReady(){
+        ytReady=true;
+        try{ytPlayer.setVolume(+document.getElementById('vol').value*100);}catch(e){}
+        if(ytPendingLoad){const p=ytPendingLoad;ytPendingLoad=null;p();}
+      },
       onStateChange(e){
         ytIsPlaying = e.data===YT.PlayerState.PLAYING;
         if(e.data===YT.PlayerState.PLAYING){playing=true;document.getElementById('btn-play').textContent='⏸';showHUD();}
@@ -926,6 +953,19 @@ async function ytHandleError(){
 }
 function ytNext(){if(!ytQ.length)return;ytLoad((ytIdx+1)%ytQ.length);}
 function ytPrev(){if(!ytQ.length)return;ytLoad((ytIdx-1+ytQ.length)%ytQ.length);}
+
+// The YouTube iframe API has no 'timeupdate' event like <audio> does, so the
+// progress bar / time labels need to be polled manually while a YT video plays.
+setInterval(()=>{
+  if(activeEngine!=='yt'||!ytPlayer||!ytReady)return;
+  let cur,dur;
+  try{ cur=ytPlayer.getCurrentTime(); dur=ytPlayer.getDuration(); }catch(e){ return; }
+  if(!isFinite(cur)||!isFinite(dur))return;
+  const p=dur?cur/dur*100:0;
+  document.getElementById('progress-fill').style.width=p+'%';
+  document.getElementById('time-cur').textContent=fmt(cur);
+  document.getElementById('time-tot').textContent=fmt(dur);
+},400);
 function ytRemove(i){
   ytQ.splice(i,1);if(ytIdx>=ytQ.length)ytIdx=ytQ.length-1;renderYtQ();
   if(!ytQ.length){document.getElementById('yt-wrap').style.display='none';document.getElementById('yt-empty').style.display='block';ytIdx=-1;ytIsPlaying=false;}
@@ -1868,6 +1908,21 @@ document.getElementById('rot-spd').addEventListener('input',e=>{document.getElem
 document.getElementById('glow-level').addEventListener('input',e=>{document.getElementById('val-glow').textContent=(+e.target.value).toFixed(2);});
 document.querySelectorAll('[data-viz]').forEach(b=>b.addEventListener('click',()=>{vizMode=b.dataset.viz;document.querySelectorAll('[data-viz]').forEach(x=>x.classList.remove('active'));b.classList.add('active');}));
 
+// ---- Viz Mode / Colors / Voxel Grid sub-tabs ----
+document.querySelectorAll('.subtab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const tab=btn.dataset.subtab;
+    btn.parentElement.querySelectorAll('.subtab-btn').forEach(b=>b.classList.toggle('active', b===btn));
+    document.querySelectorAll(`.subtab-pane`).forEach(p=>p.classList.toggle('active', p.dataset.subpane===tab));
+  });
+});
+
+// ---- Show/hide the voxel grid independently of the 3D model ----
+function toggleVoxelVis(){
+  document.getElementById('canvas').style.display = document.getElementById('show-voxels').checked ? 'block' : 'none';
+}
+document.getElementById('show-voxels').addEventListener('change',toggleVoxelVis);
+
 // ═══════════════════════════════════════════════════════════
 //  VISUALIZER PRESETS (saved locally in this browser)
 // ═══════════════════════════════════════════════════════════
@@ -1885,6 +1940,7 @@ function collectVizSettings(){
     showFloor: document.getElementById('show-floor').checked, rainbowBg: document.getElementById('rainbow-bg').checked,
     rotSpd: document.getElementById('rot-spd').value, colBg: document.getElementById('col-bg').value,
     showModel: document.getElementById('show-model').checked, modelWire: document.getElementById('model-wire').checked,
+    showVoxels: document.getElementById('show-voxels').checked,
     distortAmt: document.getElementById('distort-amt').value, modelSize: document.getElementById('model-size').value,
     modelOpacity: document.getElementById('model-opacity').value, emissiveAmt: document.getElementById('emissive-amt').value
   };
@@ -1906,6 +1962,8 @@ function applyVizSettings(s){
   setCheck('auto-rot',s.autoRot); setCheck('beat-pulse',s.beatPulse); setCheck('use-glow',s.useGlow);
   setCheck('show-floor',s.showFloor); setCheck('rainbow-bg',s.rainbowBg);
   setCheck('show-model',s.showModel); setCheck('model-wire',s.modelWire);
+  setCheck('show-voxels',s.showVoxels);
+  toggleVoxelVis();
   if(s.colLo){ document.getElementById('col-lo').value=s.colLo; }
   if(s.colHi){ document.getElementById('col-hi').value=s.colHi; }
   if(s.colBg){ document.getElementById('col-bg').value=s.colBg; }
