@@ -71,8 +71,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 .ttrack::after{content:'';position:absolute;width:10px;height:10px;background:var(--bg);top:4px;left:4px;transition:transform .15s}
 .toggle input:checked+.ttrack::after{transform:translateX(14px)}
 .color-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.subtab-nav{display:flex;gap:4px;margin-bottom:12px}
-.subtab-btn{flex:1;padding:7px 4px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'VT323',monospace;font-size:14px;letter-spacing:1px;cursor:pointer;text-align:center;border-radius:2px;transition:all .1s}
+.subtab-nav{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px}
+.subtab-btn{flex:1 1 auto;min-width:64px;padding:7px 4px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'VT323',monospace;font-size:14px;letter-spacing:1px;cursor:pointer;text-align:center;border-radius:2px;transition:all .1s}
 .subtab-btn:hover{border-color:var(--accent);color:var(--accent)}
 .subtab-btn.active{border-color:var(--accent);background:rgba(170,255,68,.12);color:var(--accent)}
 .subtab-pane{display:none}
@@ -449,6 +449,7 @@ header{flex:0 0 auto}
               <button class="subtab-btn active" data-subtab="vizmode">Viz Mode</button>
               <button class="subtab-btn" data-subtab="colors">Colors</button>
               <button class="subtab-btn" data-subtab="voxelgrid">Voxel Grid</button>
+              <button class="subtab-btn" data-subtab="render">Render</button>
             </div>
 
             <div class="subtab-pane active" data-subpane="vizmode">
@@ -478,63 +479,71 @@ header{flex:0 0 auto}
               <div class="control"><div class="ctrl-row"><span class="ctrl-label">Sensitivity</span><span class="ctrl-val" id="val-sens">1.0</span></div><input type="range" id="sens" min="0.5" max="4" value="1.0" step="0.1"></div>
               <div class="control"><div class="ctrl-row"><span class="ctrl-label">Smoothing</span><span class="ctrl-val" id="val-smooth">0.85</span></div><input type="range" id="smooth" min="0.1" max="0.97" value="0.85" step="0.01"></div>
             </div>
-          </div>
-          <!-- PRESETS FOR THE CURRENT ALBUM/PLAYLIST (account-based, shareable) -->
-          <div class="panel" id="cloud-preset-panel" style="display:none">
-            <div class="panel-title">Presets for "<span id="cloud-preset-context-name" style="color:var(--accent)"></span>"</div>
-            <div class="playlist-list" id="cloud-preset-list"></div>
-            <div id="cloud-preset-save-area" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-              <div class="lib-field" style="margin-bottom:6px">
-                <input type="text" id="cloud-preset-name" class="lib-input" placeholder="name this preset...">
-              </div>
-              <button class="lib-btn" id="cloud-preset-save-btn" style="margin-top:0">PUBLISH PRESET</button>
-              <div class="lib-status" id="cloud-preset-status"></div>
-            </div>
-          </div>
-          <!-- PRESETS -->
-          <div class="panel">
-            <div class="panel-title">Device Presets</div>
-            <div class="lib-status" style="margin-top:0">saved only in this browser — not shared with anyone</div>
-            <div class="lib-field" style="margin-bottom:6px">
-              <input type="text" id="preset-name" class="lib-input" placeholder="preset name...">
-            </div>
-            <button class="lib-btn" id="preset-save-btn" style="margin-top:0">SAVE CURRENT SETTINGS</button>
-            <div class="lib-status" id="preset-status"></div>
-            <div class="playlist-list" id="preset-list" style="margin-top:6px"></div>
-          </div>
-          <!-- RENDER (grid render options + 3D model, all in one place) -->
-          <div class="panel">
-            <div class="panel-title">Render</div>
-            <div class="toggle-row"><span class="ctrl-label">Auto-Rotate</span><label class="toggle"><input type="checkbox" id="auto-rot" checked><div class="ttrack"></div></label></div>
-            <div class="toggle-row"><span class="ctrl-label">Beat Pulse</span><label class="toggle"><input type="checkbox" id="beat-pulse" checked><div class="ttrack"></div></label></div>
-            <div class="toggle-row"><span class="ctrl-label">Glow Effect</span><label class="toggle"><input type="checkbox" id="use-glow" checked><div class="ttrack"></div></label></div>
-            <div class="control"><div class="ctrl-row"><span class="ctrl-label">Glow Level</span><span class="ctrl-val" id="val-glow">0.28</span></div><input type="range" id="glow-level" min="0.02" max="0.8" value="0.28" step="0.02"></div>
-            <div class="toggle-row"><span class="ctrl-label">Show Floor</span><label class="toggle"><input type="checkbox" id="show-floor" checked><div class="ttrack"></div></label></div>
-            <div class="toggle-row"><span class="ctrl-label">Rainbow BG</span><label class="toggle"><input type="checkbox" id="rainbow-bg"><div class="ttrack"></div></label></div>
-            <div class="control" style="margin-top:8px"><div class="ctrl-row"><span class="ctrl-label">Rotation Speed</span><span class="ctrl-val" id="val-rotspd">0.3</span></div><input type="range" id="rot-spd" min="0" max="2" value="0.3" step="0.05"></div>
-            <div class="color-row"><span class="ctrl-label">Background</span><input type="color" id="col-bg" value="#0d0f0b"></div>
 
-            <div class="panel-title" style="color:var(--accent3);margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">3D Model</div>
-            <div class="lib-field" style="margin-bottom:6px">
-              <input type="text" id="poly-search-input" class="lib-input" placeholder="search free models (e.g. skull, car, tree)...">
+            <div class="subtab-pane" data-subpane="render">
+              <div class="toggle-row"><span class="ctrl-label">Auto-Rotate</span><label class="toggle"><input type="checkbox" id="auto-rot" checked><div class="ttrack"></div></label></div>
+              <div class="toggle-row"><span class="ctrl-label">Beat Pulse</span><label class="toggle"><input type="checkbox" id="beat-pulse" checked><div class="ttrack"></div></label></div>
+              <div class="toggle-row"><span class="ctrl-label">Glow Effect</span><label class="toggle"><input type="checkbox" id="use-glow" checked><div class="ttrack"></div></label></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Glow Level</span><span class="ctrl-val" id="val-glow">0.28</span></div><input type="range" id="glow-level" min="0.02" max="0.8" value="0.28" step="0.02"></div>
+              <div class="toggle-row"><span class="ctrl-label">Show Floor</span><label class="toggle"><input type="checkbox" id="show-floor" checked><div class="ttrack"></div></label></div>
+              <div class="toggle-row"><span class="ctrl-label">Rainbow BG</span><label class="toggle"><input type="checkbox" id="rainbow-bg"><div class="ttrack"></div></label></div>
+              <div class="control" style="margin-top:8px"><div class="ctrl-row"><span class="ctrl-label">Rotation Speed</span><span class="ctrl-val" id="val-rotspd">0.3</span></div><input type="range" id="rot-spd" min="0" max="2" value="0.3" step="0.05"></div>
+              <div class="color-row"><span class="ctrl-label">Background</span><input type="color" id="col-bg" value="#0d0f0b"></div>
+
+              <div class="panel-title" style="color:var(--accent3);margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">3D Model</div>
+              <div class="lib-field" style="margin-bottom:6px">
+                <input type="text" id="poly-search-input" class="lib-input" placeholder="search free models (e.g. skull, car, tree)...">
+              </div>
+              <button class="lib-btn" id="poly-search-btn" style="margin-top:0;border-color:var(--accent3);color:var(--accent3)">SEARCH FREE MODELS</button>
+              <div class="lib-status" id="poly-search-status"></div>
+              <div id="poly-search-results" style="margin-top:6px"></div>
+              <div class="model-dz" id="model-dz" style="margin-top:10px">
+                <input type="file" id="model-input" accept=".obj,.glb,.gltf">
+                <span class="drop-icon" style="color:var(--accent3)">[◈]</span>
+                <div class="drop-text">or drop your own <strong style="color:var(--accent3)">.obj .glb .gltf</strong></div>
+              </div>
+              <div class="model-info" id="model-info"></div>
+              <div id="model-ctrl">
+                <div class="toggle-row" style="margin-top:10px"><span class="ctrl-label">Show Model</span><label class="toggle"><input type="checkbox" id="show-model" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
+                <div class="toggle-row"><span class="ctrl-label">Wireframe</span><label class="toggle"><input type="checkbox" id="model-wire"><div class="ttrack"></div></label></div>
+                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Distortion</span><span class="ctrl-val" id="val-distort" style="color:var(--accent3)">0.50</span></div><input type="range" id="distort-amt" min="0" max="3" value="0.5" step="0.05"></div>
+                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Model Scale</span><span class="ctrl-val" id="val-mscale" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-size" min="0.2" max="5" value="1.0" step="0.1"></div>
+                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Opacity</span><span class="ctrl-val" id="val-mopacity" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-opacity" min="0.05" max="1" value="1.0" step="0.05"></div>
+                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Emissive Boost</span><span class="ctrl-val" id="val-emissive" style="color:var(--accent3)">0.5</span></div><input type="range" id="emissive-amt" min="0" max="2" value="0.5" step="0.05"></div>
+                <button id="remove-model-btn" class="px-btn" style="width:100%;margin-top:4px;border-color:var(--accent2);color:var(--accent2)">✕ Remove Model</button>
+              </div>
             </div>
-            <button class="lib-btn" id="poly-search-btn" style="margin-top:0;border-color:var(--accent3);color:var(--accent3)">SEARCH FREE MODELS</button>
-            <div class="lib-status" id="poly-search-status"></div>
-            <div id="poly-search-results" style="margin-top:6px"></div>
-            <div class="model-dz" id="model-dz" style="margin-top:10px">
-              <input type="file" id="model-input" accept=".obj,.glb,.gltf">
-              <span class="drop-icon" style="color:var(--accent3)">[◈]</span>
-              <div class="drop-text">or drop your own <strong style="color:var(--accent3)">.obj .glb .gltf</strong></div>
+          </div>
+          <!-- PRESETS — Device (local browser) and Public (account-based, tied to an album/playlist) -->
+          <div class="panel">
+            <div class="subtab-nav">
+              <button class="subtab-btn active" data-subtab="presets-device">Device</button>
+              <button class="subtab-btn" data-subtab="presets-public">Public</button>
             </div>
-            <div class="model-info" id="model-info"></div>
-            <div id="model-ctrl">
-              <div class="toggle-row" style="margin-top:10px"><span class="ctrl-label">Show Model</span><label class="toggle"><input type="checkbox" id="show-model" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
-              <div class="toggle-row"><span class="ctrl-label">Wireframe</span><label class="toggle"><input type="checkbox" id="model-wire"><div class="ttrack"></div></label></div>
-              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Distortion</span><span class="ctrl-val" id="val-distort" style="color:var(--accent3)">0.50</span></div><input type="range" id="distort-amt" min="0" max="3" value="0.5" step="0.05"></div>
-              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Model Scale</span><span class="ctrl-val" id="val-mscale" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-size" min="0.2" max="5" value="1.0" step="0.1"></div>
-              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Opacity</span><span class="ctrl-val" id="val-mopacity" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-opacity" min="0.05" max="1" value="1.0" step="0.05"></div>
-              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Emissive Boost</span><span class="ctrl-val" id="val-emissive" style="color:var(--accent3)">0.5</span></div><input type="range" id="emissive-amt" min="0" max="2" value="0.5" step="0.05"></div>
-              <button id="remove-model-btn" class="px-btn" style="width:100%;margin-top:4px;border-color:var(--accent2);color:var(--accent2)">✕ Remove Model</button>
+
+            <div class="subtab-pane active" data-subpane="presets-device">
+              <div class="lib-status" style="margin-top:0">saved only in this browser — not shared with anyone</div>
+              <div class="lib-field" style="margin-bottom:6px">
+                <input type="text" id="preset-name" class="lib-input" placeholder="preset name...">
+              </div>
+              <button class="lib-btn" id="preset-save-btn" style="margin-top:0">SAVE CURRENT SETTINGS</button>
+              <div class="lib-status" id="preset-status"></div>
+              <div class="playlist-list" id="preset-list" style="margin-top:6px"></div>
+            </div>
+
+            <div class="subtab-pane" data-subpane="presets-public">
+              <div class="lib-status" style="margin-top:0" id="cloud-preset-context-line">open an album or playlist to see (and share) presets for it.</div>
+              <div id="cloud-preset-body" style="display:none">
+                <div class="panel-title" style="margin-bottom:8px">Presets for "<span id="cloud-preset-context-name" style="color:var(--accent)"></span>"</div>
+                <div class="playlist-list" id="cloud-preset-list"></div>
+                <div id="cloud-preset-save-area" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+                  <div class="lib-field" style="margin-bottom:6px">
+                    <input type="text" id="cloud-preset-name" class="lib-input" placeholder="name this preset...">
+                  </div>
+                  <button class="lib-btn" id="cloud-preset-save-btn" style="margin-top:0">PUBLISH PRESET</button>
+                  <div class="lib-status" id="cloud-preset-status"></div>
+                </div>
+              </div>
             </div>
           </div>
         </aside>
@@ -1908,12 +1917,13 @@ document.getElementById('rot-spd').addEventListener('input',e=>{document.getElem
 document.getElementById('glow-level').addEventListener('input',e=>{document.getElementById('val-glow').textContent=(+e.target.value).toFixed(2);});
 document.querySelectorAll('[data-viz]').forEach(b=>b.addEventListener('click',()=>{vizMode=b.dataset.viz;document.querySelectorAll('[data-viz]').forEach(x=>x.classList.remove('active'));b.classList.add('active');}));
 
-// ---- Viz Mode / Colors / Voxel Grid sub-tabs ----
+// ---- Sub-tabs (Viz Mode/Colors/Voxel Grid/Render, and Device/Public Presets) ----
 document.querySelectorAll('.subtab-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
+    const scope=btn.closest('.panel');
     const tab=btn.dataset.subtab;
-    btn.parentElement.querySelectorAll('.subtab-btn').forEach(b=>b.classList.toggle('active', b===btn));
-    document.querySelectorAll(`.subtab-pane`).forEach(p=>p.classList.toggle('active', p.dataset.subpane===tab));
+    scope.querySelectorAll('.subtab-btn').forEach(b=>b.classList.toggle('active', b===btn));
+    scope.querySelectorAll('.subtab-pane').forEach(p=>p.classList.toggle('active', p.dataset.subpane===tab));
   });
 });
 
@@ -2031,12 +2041,18 @@ renderPresetList();
 // ═══════════════════════════════════════════════════════════
 let cloudPresets = [];
 async function loadContextPresets(){
-  const wrap=document.getElementById('cloud-preset-panel');
+  const lineEl=document.getElementById('cloud-preset-context-line');
+  const bodyEl=document.getElementById('cloud-preset-body');
   const el=document.getElementById('cloud-preset-list');
   const saveArea=document.getElementById('cloud-preset-save-area');
-  if(!wrap||!el) return;
-  if(!currentPlayContext || !CONFIGURED){ wrap.style.display='none'; return; }
-  wrap.style.display='block';
+  if(!el) return;
+  if(!currentPlayContext || !CONFIGURED){
+    if(lineEl) lineEl.style.display='block';
+    if(bodyEl) bodyEl.style.display='none';
+    return;
+  }
+  if(lineEl) lineEl.style.display='none';
+  if(bodyEl) bodyEl.style.display='block';
   document.getElementById('cloud-preset-context-name').textContent = currentPlayContext.name;
   saveArea.style.display = libCurrentUser ? 'block' : 'none';
   const col = currentPlayContext.type==='album' ? 'album_id' : 'playlist_id';
