@@ -500,6 +500,7 @@ header{flex:0 0 auto}
             <button class="lib-btn" id="poly-search-btn" style="margin-top:0;border-color:var(--accent3);color:var(--accent3)">SEARCH FREE MODELS</button>
             <div class="lib-status" id="poly-search-status"></div>
             <div id="poly-search-results" style="margin-top:6px"></div>
+            <div class="lib-status" id="poly-model-credit" style="opacity:.7"></div>
             <div class="model-dz" id="model-dz" style="margin-top:10px">
               <input type="file" id="model-input" accept=".obj,.glb,.gltf">
               <span class="drop-icon" style="color:var(--accent3)">[◈]</span>
@@ -987,11 +988,19 @@ function ytRemove(i){
 // ═══════════════════════════════════════════════════════════
 // ---- config — replace these with your own project's values ----
 const SUPABASE_URL = 'https://eepyrwxplzgvxfwmtjsv.supabase.co';
+// This is Supabase's "publishable" (anon) key — unlike a real secret it's
+// designed to be shipped in client-side code; access is enforced server-side
+// by Supabase's row-level security policies, not by hiding this value.
 const SUPABASE_KEY = 'sb_publishable_HfKPjZSEQ31YJBQqdDaEXQ_l4_PhK53';
-const YT_API_KEY = 'AIzaSyCVL0aQbZKcBXJ6ueB-j-2zQ1HquZaqYRw'; // Google Cloud Console → enable "YouTube Data API v3" → Credentials → API key
-const POLY_PIZZA_API_KEY = 'd385ea0cd5bb4dd7bdcf5652554311a4'; // poly.pizza/settings/api — free CC0/CC-BY low-poly model search
+// Poly Pizza's and YouTube's real API keys now live server-side only, as
+// secrets on Supabase Edge Functions (see supabase/functions/poly-pizza-search
+// and supabase/functions/youtube-search). The browser calls those functions
+// instead of the upstream APIs directly, so the real keys never ship in
+// client-side JS where anyone could copy them out of view-source.
+const POLY_PIZZA_SEARCH_URL = SUPABASE_URL + '/functions/v1/poly-pizza-search';
+const YT_SEARCH_URL = SUPABASE_URL + '/functions/v1/youtube-search';
 const CONFIGURED = !SUPABASE_URL.startsWith('YOUR_') && !SUPABASE_KEY.startsWith('YOUR_');
-const YT_SEARCH_CONFIGURED = !YT_API_KEY.startsWith('YOUR_');
+const YT_SEARCH_CONFIGURED = CONFIGURED; // actual key presence is checked server-side by the edge function
 const sb = CONFIGURED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 let bannerStackBottom = 12;
@@ -1005,8 +1014,7 @@ function addConfigBanner(text, color){
   document.body.appendChild(banner);
   bannerStackBottom += 54;
 }
-if(!CONFIGURED) addConfigBanner('Supabase not configured — see README.md.');
-if(CONFIGURED && !YT_SEARCH_CONFIGURED) addConfigBanner('No YouTube API key — Add Album search is disabled.', 'var(--accent2)');
+if(!CONFIGURED) addConfigBanner('Supabase not configured — library sync and Add Album search are disabled. See README.md.');
 
 // ---- accounts: username mapped to a synthetic email ----
 const USERNAME_AUTH_DOMAIN = 'cratefm.local';
@@ -1020,12 +1028,12 @@ let libPlaylists = [];     // {id,name,playlist_tracks:[{id,position,tracks:{...
 let libSearchTerm = '';
 let libActiveAlbumId = null;
 let currentPlayContext = null; // {type:'album'|'playlist', id, name} — set when an album/playlist modal is opened; used to attach cloud presets
-let currentPolyModel = null;   // {title,thumbnail,downloadUrl,license,author} if the loaded 3D model came from Poly Pizza search — cleared on local upload/remove
+let currentPolyModel = null;   // {title,thumbnail,downloadUrl,license,author,attribution} if the loaded 3D model came from Poly Pizza search — cleared on local upload/remove
 
 // ---- YouTube album search (search for full-album playlists) ----
 async function searchYouTubeAlbums(term){
-  if(!YT_SEARCH_CONFIGURED) throw new Error('no YouTube API key configured');
-  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=playlist&maxResults=12&q=${encodeURIComponent(term + ' full album')}&key=${YT_API_KEY}`;
+  if(!YT_SEARCH_CONFIGURED) throw new Error('no YouTube search backend configured');
+  const url = `${YT_SEARCH_URL}?endpoint=search&part=snippet&type=playlist&maxResults=12&q=${encodeURIComponent(term + ' full album')}`;
   const res = await fetch(url);
   if(!res.ok) throw new Error('YouTube search failed (' + res.status + ')');
   const data = await res.json();
@@ -1048,7 +1056,7 @@ function iso8601DurationToMs(dur){
 async function fetchYouTubePlaylistTracks(playlistId){
   let items = [], pageToken = '';
   do{
-    const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${encodeURIComponent(playlistId)}&key=${YT_API_KEY}` + (pageToken ? '&pageToken=' + pageToken : '');
+    const url = `${YT_SEARCH_URL}?endpoint=playlistItems&part=snippet,contentDetails&maxResults=50&playlistId=${encodeURIComponent(playlistId)}` + (pageToken ? '&pageToken=' + pageToken : '');
     const res = await fetch(url);
     if(!res.ok) throw new Error('could not load playlist tracks (' + res.status + ')');
     const data = await res.json();
@@ -1062,7 +1070,7 @@ async function fetchYouTubePlaylistTracks(playlistId){
   for(let i=0; i<ids.length; i+=50){
     const batch = ids.slice(i, i+50);
     try{
-      const res2 = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status&id=${batch.join(',')}&key=${YT_API_KEY}`);
+      const res2 = await fetch(`${YT_SEARCH_URL}?endpoint=videos&part=contentDetails,status&id=${batch.join(',')}`);
       if(res2.ok){
         const data2 = await res2.json();
         (data2.items || []).forEach(v => {
@@ -1086,7 +1094,7 @@ async function fetchYouTubePlaylistTracks(playlistId){
 async function searchYouTubeVideoId(query){
   if(!YT_SEARCH_CONFIGURED) return null;
   try{
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&videoCategoryId=10&q=${encodeURIComponent(query)}&key=${YT_API_KEY}`;
+    const url = `${YT_SEARCH_URL}?endpoint=search&part=snippet&type=video&maxResults=1&videoCategoryId=10&q=${encodeURIComponent(query)}`;
     const res = await fetch(url);
     if(!res.ok) return null;
     const data = await res.json();
@@ -1259,7 +1267,7 @@ async function doAlbumSearch(){
   const statusEl = document.getElementById('album-search-status');
   const resultsEl = document.getElementById('album-search-results');
   if(!term){ statusEl.textContent = 'type something to search for.'; return; }
-  if(!YT_SEARCH_CONFIGURED){ statusEl.textContent = 'no YouTube API key configured — see README.md.'; return; }
+  if(!YT_SEARCH_CONFIGURED){ statusEl.textContent = 'YouTube search backend not connected — see README.md.'; return; }
   statusEl.textContent = 'searching YouTube...';
   resultsEl.innerHTML = '';
   try{
@@ -1779,6 +1787,7 @@ function onModelLoaded(obj,fname){
 function loadModel(file){
   if(!threeR)initThree();
   currentPolyModel = null;
+  updatePolyCredit();
   const url=URL.createObjectURL(file),ext=file.name.split('.').pop().toLowerCase();
   if(ext==='glb'||ext==='gltf'){
     if(!THREE.GLTFLoader){alert('GLTFLoader not available. Check internet connection.');return;}
@@ -1808,23 +1817,23 @@ function loadModelFromUrl(url,label,ext){
 }
 
 // ---- Poly Pizza model search (free CC0/CC-BY low-poly models) ----
+// Field names match the Poly Pizza API v1.1 "Model" schema:
+// { id, title, description, attribution, thumbnail, download, triCount,
+//   creator:{name,url}, uploadDate, category, license, animated, orbit }
+// `attribution` is Poly Pizza's own suggested credit line (e.g. "Title by
+// Author is licensed under CC-BY") — prefer that over building our own.
 async function searchPolyPizzaModels(query){
-  const res=await fetch(`https://api.poly.pizza/search/${encodeURIComponent(query)}?results=15`, {
-    headers:{ 'x-auth-token': POLY_PIZZA_API_KEY }
-  });
+  const res=await fetch(`${POLY_PIZZA_SEARCH_URL}?q=${encodeURIComponent(query)}&results=15`);
   if(!res.ok) throw new Error('Poly Pizza search failed ('+res.status+')');
   const data=await res.json();
-  // Field names aren't fully confirmed against the (bot-protected) official docs —
-  // this defensively checks a few likely key spellings and logs the raw response
-  // so it's easy to fix mapping later if a field comes back empty.
-  const list=Array.isArray(data)?data:(data.results||data.Results||data.models||[]);
-  console.log('Poly Pizza raw response:', data);
+  const list=Array.isArray(data)?data:(data.results||[]);
   return list.map(m=>({
-    title: m.Title||m.title||m.name||m.Name||'untitled',
-    thumbnail: m.Thumbnail||m.thumbnail||m.thumbnailUrl||m.image||m.Image||'',
-    downloadUrl: m.Download||m.download||m.downloadUrl||m.DownloadUrl||m.glb||m.Url||m.url||m.ModelUrl||'',
-    license: m.License||m.license||'',
-    author: (m.Attribution&&(m.Attribution.Name||m.Attribution.name))||m.author||m.Author||m.username||''
+    title: m.title||'untitled',
+    thumbnail: m.thumbnail||'',
+    downloadUrl: m.download||'',
+    license: m.license||'',
+    author: (m.creator&&m.creator.name)||'',
+    attribution: m.attribution||''
   })).filter(m=>m.downloadUrl);
 }
 function renderPolyResults(list){
@@ -1844,11 +1853,28 @@ function renderPolyResults(list){
     item.querySelector('.sr-add').addEventListener('click', ()=>{
       const statusEl=document.getElementById('poly-search-status');
       statusEl.textContent=`loading "${m.title}"...`;
-      const credit = m.license && m.license.toUpperCase()!=='CC0' && m.author ? ` — credit: ${m.title} by ${m.author} (${m.license})` : '';
       currentPolyModel = m;
-      loadModelFromUrl(m.downloadUrl, m.title+credit);
+      updatePolyCredit();
+      loadModelFromUrl(m.downloadUrl, m.title);
     });
   });
+}
+// Small persistent credit line shown under the search UI, per Poly Pizza's
+// attribution requirements for non-CC0 models. Uses their own suggested
+// attribution string when available, otherwise builds a fallback from
+// title/author/license. Cleared when there's no Poly Pizza model loaded
+// (e.g. after a local file upload).
+function updatePolyCredit(){
+  const el=document.getElementById('poly-model-credit');
+  if(!el) return;
+  const m=currentPolyModel;
+  if(!m){ el.textContent=''; return; }
+  if(m.attribution){ el.textContent='Credit: '+m.attribution; return; }
+  if(m.license && m.license.toUpperCase()!=='CC0' && m.author){
+    el.textContent=`Credit: "${m.title}" by ${m.author} (${m.license}) — via Poly Pizza`;
+  }else{
+    el.textContent=`"${m.title}" — via Poly Pizza (${m.license||'CC0'})`;
+  }
 }
 document.getElementById('poly-search-btn').addEventListener('click', async ()=>{
   const q=document.getElementById('poly-search-input').value.trim();
