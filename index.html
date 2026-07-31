@@ -878,7 +878,10 @@ window.onYouTubeIframeAPIReady=function(){
         ytIsPlaying = e.data===YT.PlayerState.PLAYING;
         if(e.data===YT.PlayerState.PLAYING){playing=true;document.getElementById('btn-play').textContent='⏸';showHUD();}
         if(e.data===YT.PlayerState.PAUSED){playing=false;document.getElementById('btn-play').textContent='▶';}
-        if(e.data===YT.PlayerState.ENDED)ytNext();
+        if(e.data===YT.PlayerState.ENDED){
+          if(loop){ try{ytPlayer.seekTo(0,true);ytPlayer.playVideo();}catch(err){} }
+          else ytNext();
+        }
       },
       onError(){ ytHandleError(); }
     }
@@ -977,7 +980,7 @@ async function ytHandleError(){
   if(q.trackId&&sb)sb.from('tracks').update({youtube_video_id:found}).eq('id',q.trackId).then(()=>{},()=>{});
   try{ ytPlayer.loadVideoById(q.vid); }catch(e){}
 }
-function ytNext(){if(!ytQ.length)return;ytLoad((ytIdx+1)%ytQ.length);}
+function ytNext(){if(!ytQ.length)return;ytLoad(shuffle?Math.random()*ytQ.length|0:(ytIdx+1)%ytQ.length);}
 function ytPrev(){if(!ytQ.length)return;ytLoad((ytIdx-1+ytQ.length)%ytQ.length);}
 
 // The YouTube iframe API has no 'timeupdate' event like <audio> does, so the
