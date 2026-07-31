@@ -840,10 +840,22 @@ document.getElementById('btn-play').addEventListener('click',()=>{
     if(st===1)ytPlayer.pauseVideo();else ytPlayer.playVideo();
   } else playPause();
 });
-document.getElementById('btn-next').addEventListener('click',()=>{ if(activeEngine==='yt')ytNext();else nextTrack(); });
-document.getElementById('btn-prev').addEventListener('click',()=>{ if(activeEngine==='yt')ytPrev();else prevTrack(); });
-document.getElementById('btn-shuffle').addEventListener('click',function(){shuffle=!shuffle;this.classList.toggle('active',shuffle);});
-document.getElementById('btn-loop').addEventListener('click',function(){loop=!loop;this.classList.toggle('active',loop);});
+document.getElementById('btn-next').addEventListener('click',()=>{
+  if(activeEngine==='yt'){ if(ytInNativePlaylist()){ try{ytPlayer.nextVideo();}catch(e){} } else ytNext(); }
+  else nextTrack();
+});
+document.getElementById('btn-prev').addEventListener('click',()=>{
+  if(activeEngine==='yt'){ if(ytInNativePlaylist()){ try{ytPlayer.previousVideo();}catch(e){} } else ytPrev(); }
+  else prevTrack();
+});
+document.getElementById('btn-shuffle').addEventListener('click',function(){
+  shuffle=!shuffle;this.classList.toggle('active',shuffle);
+  if(ytPlayer&&ytReady){ try{ytPlayer.setShuffle(shuffle);}catch(e){} }
+});
+document.getElementById('btn-loop').addEventListener('click',function(){
+  loop=!loop;this.classList.toggle('active',loop);
+  if(ytPlayer&&ytReady){ try{ytPlayer.setLoop(loop);}catch(e){} }
+});
 document.getElementById('vol').addEventListener('input',e=>{
   const v=+e.target.value;
   audio.volume=v;
@@ -879,7 +891,11 @@ window.onYouTubeIframeAPIReady=function(){
         if(e.data===YT.PlayerState.PLAYING){playing=true;document.getElementById('btn-play').textContent='⏸';showHUD();}
         if(e.data===YT.PlayerState.PAUSED){playing=false;document.getElementById('btn-play').textContent='▶';}
         if(e.data===YT.PlayerState.ENDED){
-          if(loop){ try{ytPlayer.seekTo(0,true);ytPlayer.playVideo();}catch(err){} }
+          if(ytInNativePlaylist()){
+            // A real YouTube playlist (loaded via loadPlaylist/list=) advances
+            // itself internally — calling our own ytNext() here would instead
+            // reload the whole playlist from video 1, which looks like looping.
+          } else if(loop){ try{ytPlayer.seekTo(0,true);ytPlayer.playVideo();}catch(err){} }
           else ytNext();
         }
       },
@@ -888,6 +904,7 @@ window.onYouTubeIframeAPIReady=function(){
   });
 };
 
+function ytInNativePlaylist(){ const q=ytQ[ytIdx]; return !!(q&&q.pid); }
 function parseYT(url){
   const v=url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   const p=url.match(/[?&]list=([A-Za-z0-9_-]+)/);
@@ -949,8 +966,8 @@ async function ytLoad(i){
   }
   const doLoad=()=>{
     try{
-      if(q.pid&&!q.vid)ytPlayer.loadPlaylist({list:q.pid,listType:'playlist'});
-      else if(q.vid){if(q.pid)ytPlayer.loadVideoById({videoId:q.vid,list:q.pid,listType:'playlist'});else ytPlayer.loadVideoById(q.vid);}
+      if(q.pid&&!q.vid){ytPlayer.loadPlaylist({list:q.pid,listType:'playlist'});try{ytPlayer.setShuffle(shuffle);ytPlayer.setLoop(loop);}catch(e){}}
+      else if(q.vid){if(q.pid){ytPlayer.loadVideoById({videoId:q.vid,list:q.pid,listType:'playlist'});try{ytPlayer.setShuffle(shuffle);ytPlayer.setLoop(loop);}catch(e){}}else ytPlayer.loadVideoById(q.vid);}
     }catch(e){}
   };
   if(ytReady)doLoad();else ytPendingLoad=doLoad;
@@ -1658,13 +1675,44 @@ function renderFrame(ts){
   const vs=Math.max(2,Math.round(scale*12*.7));
   const voxels=[];
 
+  // Half-edge vectors for a unit cube, rotated into camera space once per
+  // frame (rotation is linear, so this is the same for every voxel).
+  const cs=scale*.9;
+  const axR=rotVec(.5,0,0,view.rotX,view.rotY).map(v=>v*cs);
+  const ayR=rotVec(0,.5,0,view.rotX,view.rotY).map(v=>v*cs);
+  const azR=rotVec(0,0,.5,view.rotX,view.rotY).map(v=>v*cs);
+  // Of each pair of opposite faces, only the one turned toward the camera
+  // is ever visible — pick it once per frame using each axis's rotated z.
+  const signX=axR[2]>0?-1:1,signY=ayR[2]>0?-1:1,signZ=azR[2]>0?-1:1;
+
   for(let x=0;x<gridW;x++)for(let z=0;z<gridD;z++){
     const h=Math.ceil(heights[x*gridD+z]);
     for(let y=0;y<h;y++){
       const yt=y/gridH,rgb=getColor(yt,beatBoost*(1-yt)),rv=rotVec(x-cxg,y-cyg,z-czg,view.rotX,view.rotY);
-      const[sx,sy]=proj(rv[0]*scale*.9,rv[1]*scale*.9,rv[2]*scale*.9,W,H);
+      const cx3=rv[0]*cs,cy3=rv[1]*cs,cz3=rv[2]*cs;
+      const[sx,sy]=proj(cx3,cy3,cz3,W,H);
       const fog=Math.max(.2,Math.min(1,1-rv[2]/(Math.max(gridW,gridD)*scale*1.2)));
-      voxels.push({sx,sy,depth:rv[2],rgb,fog});
+      // Cubes buried below the top of a column are almost entirely hidden
+      // behind their neighbors, so only the top cube of each column pays
+      // for full corner projection + face fills; the rest get a cheap rect.
+      if(vs<=3||y<h-1){ voxels.push({sx,sy,depth:rv[2],rgb,fog,simple:true}); continue; }
+      // Project all 8 corners of the cube, indexed by sign bits, then
+      // pull out the 3 visible faces (top/bottom, left/right, front/back).
+      const corners=new Array(8);
+      for(let bx=0;bx<2;bx++)for(let by=0;by<2;by++)for(let bz=0;bz<2;bz++){
+        const mx=bx?1:-1,my=by?1:-1,mz=bz?1:-1;
+        corners[(bx<<2)|(by<<1)|bz]=proj(
+          cx3+mx*axR[0]+my*ayR[0]+mz*azR[0],
+          cy3+mx*axR[1]+my*ayR[1]+mz*azR[1],
+          cz3+mx*axR[2]+my*ayR[2]+mz*azR[2],W,H);
+      }
+      const get=(sxx,syy,szz)=>corners[((sxx>0?1:0)<<2)|((syy>0?1:0)<<1)|(szz>0?1:0)];
+      const faces=[
+        {pts:[get(signX,-1,-1),get(signX,1,-1),get(signX,1,1),get(signX,-1,1)],f:.6},
+        {pts:[get(-1,signY,-1),get(1,signY,-1),get(1,signY,1),get(-1,signY,1)],f:1},
+        {pts:[get(-1,-1,signZ),get(1,-1,signZ),get(1,1,signZ),get(-1,1,signZ)],f:.8}
+      ];
+      voxels.push({sx,sy,depth:rv[2],rgb,fog,faces});
     }
     if(document.getElementById('show-floor').checked){
       const rv=rotVec(x-cxg,-.5,z-czg,view.rotX,view.rotY);
@@ -1672,13 +1720,23 @@ function renderFrame(ts){
       voxels.push({sx,sy,depth:rv[2]+.001,isFloor:true});
     }
   }
-  voxels.sort((a,b)=>a.depth-b.depth);
+  voxels.sort((a,b)=>b.depth-a.depth); // farthest first, so nearer cubes paint over them
+  ctx.strokeStyle='rgba(0,0,0,0.25)';ctx.lineWidth=.5;
+  const doStroke=vs>6;
   for(const v of voxels){
     if(v.isFloor){ctx.fillStyle='rgba(40,60,30,0.3)';ctx.fillRect(v.sx-vs/2,v.sy-vs/4,vs,vs/2);continue;}
     const fr=[v.rgb[0]*v.fog|0,v.rgb[1]*v.fog|0,v.rgb[2]*v.fog|0];
-    ctx.fillStyle=shade(fr,1);ctx.fillRect(v.sx-vs/2,v.sy-vs/2,vs,vs);
-    if(vs>3){const sh=Math.max(2,vs*.35|0);ctx.fillStyle=shade(fr,.55);ctx.fillRect(v.sx-vs/2,v.sy+vs/2-1,vs*.45|0,sh);ctx.fillStyle=shade(fr,.72);ctx.fillRect(v.sx+vs/2-(vs*.45|0),v.sy+vs/2-1,vs*.45|0,sh);}
-    if(vs>4){ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=.5;ctx.strokeRect(v.sx-vs/2,v.sy-vs/2,vs,vs);}
+    if(v.simple){ctx.fillStyle=shade(fr,1);ctx.fillRect(v.sx-vs/2,v.sy-vs/2,vs,vs);continue;}
+    for(const face of v.faces){
+      ctx.fillStyle=shade(fr,face.f);
+      ctx.beginPath();
+      ctx.moveTo(face.pts[0][0],face.pts[0][1]);
+      ctx.lineTo(face.pts[1][0],face.pts[1][1]);
+      ctx.lineTo(face.pts[2][0],face.pts[2][1]);
+      ctx.lineTo(face.pts[3][0],face.pts[3][1]);
+      ctx.closePath();ctx.fill();
+      if(doStroke)ctx.stroke();
+    }
   }
 
   if(document.getElementById('use-glow').checked&&hasAudio()){
