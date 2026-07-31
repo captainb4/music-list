@@ -293,6 +293,7 @@ header{flex:0 0 auto}
         <button class="rail-item" data-page="playlists"><span class="rail-icon">☰</span><span class="rail-label">Playlists</span></button>
         <button class="rail-item" data-page="community"><span class="rail-icon">◎</span><span class="rail-label">Community</span></button>
         <button class="rail-item" data-page="local"><span class="rail-icon">♪</span><span class="rail-label">Local Files</span></button>
+        <button class="rail-item" data-page="mic"><span class="rail-icon">🎤</span><span class="rail-label">Mic Input</span></button>
         <button class="rail-item" data-page="youtube"><span class="rail-icon">▶</span><span class="rail-label">YouTube</span></button>
         <button class="rail-item" data-page="account"><span class="rail-icon">◇</span><span class="rail-label">Account</span></button>
       </div>
@@ -369,9 +370,18 @@ header{flex:0 0 auto}
         </div>
       </section>
 
+      <!-- MIC INPUT -->
+      <section class="page" id="page-mic">
+        <div class="page-head"><h1 style="color:var(--accent2)">Mic Input</h1><span class="page-sub">real audio-reactive visuals from your microphone or system audio</span></div>
+        <div class="panel">
+          <button class="mic-btn" id="mic-btn">🎤 Enable Mic / System Audio Input</button>
+          <div class="yt-note">Uses your microphone directly. To visualize audio playing on your computer (e.g. YouTube, Spotify, a game) instead of room sound, route your system audio to a virtual audio cable and select that as the input when your browser asks for mic permission.</div>
+        </div>
+      </section>
+
       <!-- YOUTUBE -->
       <section class="page" id="page-youtube">
-        <div class="page-head"><h1 style="color:var(--accent2)">YouTube</h1><span class="page-sub">full songs — visuals run on a simulated rhythm during playback</span></div>
+        <div class="page-head"><h1 style="color:var(--accent2)">YouTube</h1><span class="page-sub">drop a video or playlist link to play it on the site</span></div>
         <div class="panel">
           <div class="yt-url-row">
             <input class="yt-url-input" id="yt-input" placeholder="Paste video or playlist URL…">
@@ -380,8 +390,7 @@ header{flex:0 0 auto}
           <div id="yt-wrap"><div id="yt-player"></div></div>
           <div class="yt-empty" id="yt-empty">Paste a YouTube URL or playlist link above</div>
           <div class="yt-queue" id="yt-queue" style="max-height:none"></div>
-          <button class="mic-btn" id="mic-btn">🎤 Enable Mic / System Audio Input</button>
-          <div class="yt-note">YouTube audio can't be read by browser APIs, so the grid runs on a simulated rhythm during YouTube playback (BPM/EQ shown with a "~"). For a real audio-reactive grid: enable mic and route system audio to it (e.g. a virtual audio cable).</div>
+          <div class="yt-note">YouTube audio can't be read by browser APIs, so the grid runs on a simulated rhythm during playback (BPM/EQ shown with a "~"). For real audio-reactive visuals while playing YouTube, use the <strong>Mic Input</strong> tab alongside it.</div>
         </div>
       </section>
 
