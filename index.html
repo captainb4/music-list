@@ -489,29 +489,31 @@ header{flex:0 0 auto}
               <div class="toggle-row"><span class="ctrl-label">Rainbow BG</span><label class="toggle"><input type="checkbox" id="rainbow-bg"><div class="ttrack"></div></label></div>
               <div class="control" style="margin-top:8px"><div class="ctrl-row"><span class="ctrl-label">Rotation Speed</span><span class="ctrl-val" id="val-rotspd">0.3</span></div><input type="range" id="rot-spd" min="0" max="2" value="0.3" step="0.05"></div>
               <div class="color-row"><span class="ctrl-label">Background</span><input type="color" id="col-bg" value="#0d0f0b"></div>
-
-              <div class="panel-title" style="color:var(--accent3);margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">3D Model</div>
-              <div class="lib-field" style="margin-bottom:6px">
-                <input type="text" id="poly-search-input" class="lib-input" placeholder="search free models (e.g. skull, car, tree)...">
-              </div>
-              <button class="lib-btn" id="poly-search-btn" style="margin-top:0;border-color:var(--accent3);color:var(--accent3)">SEARCH FREE MODELS</button>
-              <div class="lib-status" id="poly-search-status"></div>
-              <div id="poly-search-results" style="margin-top:6px"></div>
-              <div class="model-dz" id="model-dz" style="margin-top:10px">
-                <input type="file" id="model-input" accept=".obj,.glb,.gltf">
-                <span class="drop-icon" style="color:var(--accent3)">[◈]</span>
-                <div class="drop-text">or drop your own <strong style="color:var(--accent3)">.obj .glb .gltf</strong></div>
-              </div>
-              <div class="model-info" id="model-info"></div>
-              <div id="model-ctrl">
-                <div class="toggle-row" style="margin-top:10px"><span class="ctrl-label">Show Model</span><label class="toggle"><input type="checkbox" id="show-model" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
-                <div class="toggle-row"><span class="ctrl-label">Wireframe</span><label class="toggle"><input type="checkbox" id="model-wire"><div class="ttrack"></div></label></div>
-                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Distortion</span><span class="ctrl-val" id="val-distort" style="color:var(--accent3)">0.50</span></div><input type="range" id="distort-amt" min="0" max="3" value="0.5" step="0.05"></div>
-                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Model Scale</span><span class="ctrl-val" id="val-mscale" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-size" min="0.2" max="5" value="1.0" step="0.1"></div>
-                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Opacity</span><span class="ctrl-val" id="val-mopacity" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-opacity" min="0.05" max="1" value="1.0" step="0.05"></div>
-                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Emissive Boost</span><span class="ctrl-val" id="val-emissive" style="color:var(--accent3)">0.5</span></div><input type="range" id="emissive-amt" min="0" max="2" value="0.5" step="0.05"></div>
-                <button id="remove-model-btn" class="px-btn" style="width:100%;margin-top:4px;border-color:var(--accent2);color:var(--accent2)">✕ Remove Model</button>
-              </div>
+            </div>
+          </div>
+          <!-- 3D MODEL — its own section, between the viz tabs and presets -->
+          <div class="panel">
+            <div class="panel-title" style="color:var(--accent3)">3D Model</div>
+            <div class="lib-field" style="margin-bottom:6px">
+              <input type="text" id="poly-search-input" class="lib-input" placeholder="search free models (e.g. skull, car, tree)...">
+            </div>
+            <button class="lib-btn" id="poly-search-btn" style="margin-top:0;border-color:var(--accent3);color:var(--accent3)">SEARCH FREE MODELS</button>
+            <div class="lib-status" id="poly-search-status"></div>
+            <div id="poly-search-results" style="margin-top:6px"></div>
+            <div class="model-dz" id="model-dz" style="margin-top:10px">
+              <input type="file" id="model-input" accept=".obj,.glb,.gltf">
+              <span class="drop-icon" style="color:var(--accent3)">[◈]</span>
+              <div class="drop-text">or drop your own <strong style="color:var(--accent3)">.obj .glb .gltf</strong></div>
+            </div>
+            <div class="model-info" id="model-info"></div>
+            <div id="model-ctrl">
+              <div class="toggle-row" style="margin-top:10px"><span class="ctrl-label">Show Model</span><label class="toggle"><input type="checkbox" id="show-model" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
+              <div class="toggle-row"><span class="ctrl-label">Wireframe</span><label class="toggle"><input type="checkbox" id="model-wire"><div class="ttrack"></div></label></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Distortion</span><span class="ctrl-val" id="val-distort" style="color:var(--accent3)">0.50</span></div><input type="range" id="distort-amt" min="0" max="3" value="0.5" step="0.05"></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Model Scale</span><span class="ctrl-val" id="val-mscale" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-size" min="0.2" max="5" value="1.0" step="0.1"></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Opacity</span><span class="ctrl-val" id="val-mopacity" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-opacity" min="0.05" max="1" value="1.0" step="0.05"></div>
+              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Emissive Boost</span><span class="ctrl-val" id="val-emissive" style="color:var(--accent3)">0.5</span></div><input type="range" id="emissive-amt" min="0" max="2" value="0.5" step="0.05"></div>
+              <button id="remove-model-btn" class="px-btn" style="width:100%;margin-top:4px;border-color:var(--accent2);color:var(--accent2)">✕ Remove Model</button>
             </div>
           </div>
           <!-- PRESETS — Device (local browser) and Public (account-based, tied to an album/playlist) -->
