@@ -2042,7 +2042,7 @@ async function loadPublicPlaylists(){
   if(!el || !CONFIGURED) return;
   el.innerHTML='<div class="empty-note">loading...</div>';
   const { data, error } = await sb.from('playlists')
-    .select('*, profiles(username), playlist_tracks(count())')
+    .select('*, profiles(username), playlist_tracks(id)')
     .eq('is_public', true)
     .order('created_at', {ascending:false})
     .limit(50);
@@ -2051,7 +2051,7 @@ async function loadPublicPlaylists(){
   el.innerHTML = data.map((p,i)=>`
     <div class="playlist-item" data-index="${i}">
       <span class="playlist-name">${esc(p.name)} <span style="opacity:.6;font-size:9px">— by ${esc(p.profiles?.username||'someone')}</span></span>
-      <span class="lib-album-count">${(p.playlist_tracks&&p.playlist_tracks[0]&&p.playlist_tracks[0].count)||0}</span>
+      <span class="lib-album-count">${(p.playlist_tracks&&p.playlist_tracks.length)||0}</span>
     </div>`).join('');
   el.querySelectorAll('.playlist-item').forEach(item=>{
     const p=data[Number(item.dataset.index)];
