@@ -130,6 +130,7 @@ input[type=color]::-webkit-color-swatch-wrapper{padding:0}input[type=color]::-we
 .lib-btn{width:100%;padding:7px 6px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'VT323',monospace;font-size:15px;letter-spacing:1px;cursor:pointer;border-radius:2px;margin-top:4px}
 .lib-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
 .lib-btn:disabled{opacity:.4;cursor:default}
+.src-btn.active{border-color:var(--accent3);color:var(--accent3);background:var(--surface3,var(--surface2))}
 .lib-status{font-size:9px;color:var(--muted);margin-top:6px;line-height:1.6}
 .lib-sync{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted);margin-top:4px}
 .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
@@ -494,6 +495,10 @@ header{flex:0 0 auto}
           <!-- 3D MODEL — its own section, between the viz tabs and presets -->
           <div class="panel">
             <div class="panel-title" style="color:var(--accent3)">3D Model</div>
+            <div class="lib-field" style="margin-bottom:6px;display:flex;gap:6px">
+              <button class="lib-btn src-btn active" id="src-btn-polypizza" data-src="polypizza" style="margin-top:0;flex:1;padding:6px;font-size:9px">POLY PIZZA</button>
+              <button class="lib-btn src-btn" id="src-btn-icosa" data-src="icosa" style="margin-top:0;flex:1;padding:6px;font-size:9px">ICOSA GALLERY</button>
+            </div>
             <div class="lib-field" style="margin-bottom:6px">
               <input type="text" id="poly-search-input" class="lib-input" placeholder="search free models (e.g. skull, car, tree)...">
             </div>
@@ -998,6 +1003,10 @@ const SUPABASE_KEY = 'sb_publishable_HfKPjZSEQ31YJBQqdDaEXQ_l4_PhK53';
 // instead of the upstream APIs directly, so the real keys never ship in
 // client-side JS where anyone could copy them out of view-source.
 const POLY_PIZZA_SEARCH_URL = SUPABASE_URL + '/functions/v1/poly-pizza-search';
+// Icosa Gallery's own API (the spiritual successor to Google Poly) is public
+// and needs no API key, but we still route it through a Supabase function so
+// it goes through the same reliable, CORS-safe path as Poly Pizza.
+const ICOSA_SEARCH_URL = SUPABASE_URL + '/functions/v1/icosa-search';
 const YT_SEARCH_URL = SUPABASE_URL + '/functions/v1/youtube-search';
 const CONFIGURED = !SUPABASE_URL.startsWith('YOUR_') && !SUPABASE_KEY.startsWith('YOUR_');
 const YT_SEARCH_CONFIGURED = CONFIGURED; // actual key presence is checked server-side by the edge function
@@ -1816,6 +1825,34 @@ function loadModelFromUrl(url,label,ext){
   }
 }
 
+// ---- Icosa Gallery model search (Google Poly's open-source spiritual successor) ----
+// Field names match the Icosa Gallery API's real schema (GET /v1/assets):
+// { assets: [{ authorName, name, description, url, assetId, formats:[
+//     { root:{relativePath,contentType,url}, formatType, formatComplexity, role }
+//   ], displayName, thumbnail:{url}, triangleCount, license, licenseVersion }],
+//   totalSize, nextPageToken }
+// Each asset can have several formats (GLTF2, OBJ, etc) — we pick a GLTF2/GLB
+// one since that's what this viewer loads.
+let currentSearchSource = 'polypizza'; // 'polypizza' | 'icosa'
+async function searchIcosaModels(query){
+  const res=await fetch(`${ICOSA_SEARCH_URL}?keywords=${encodeURIComponent(query)}&pageSize=15`);
+  if(!res.ok) throw new Error('Icosa Gallery search failed ('+res.status+')');
+  const data=await res.json();
+  const list=data.assets||[];
+  return list.map(a=>{
+    const fmt = (a.formats||[]).find(f=>/gltf|glb/i.test(f.formatType||'')) || (a.formats||[])[0];
+    const downloadUrl = fmt && fmt.root ? fmt.root.url : '';
+    return {
+      title: a.displayName || a.name || 'untitled',
+      thumbnail: (a.thumbnail && a.thumbnail.url) || '',
+      downloadUrl,
+      license: a.license || '',
+      author: a.authorName || '',
+      attribution: '', // Icosa doesn't provide a pre-built attribution string like Poly Pizza does
+      source: 'Icosa Gallery'
+    };
+  }).filter(m=>m.downloadUrl);
+}
 // ---- Poly Pizza model search (free CC0/CC-BY low-poly models) ----
 // Field names match the Poly Pizza API v1.1 "Model" schema:
 // { id, title, description, attribution, thumbnail, download, triCount,
@@ -1833,7 +1870,8 @@ async function searchPolyPizzaModels(query){
     downloadUrl: m.download||'',
     license: m.license||'',
     author: (m.creator&&m.creator.name)||'',
-    attribution: m.attribution||''
+    attribution: m.attribution||'',
+    source: 'Poly Pizza'
   })).filter(m=>m.downloadUrl);
 }
 function renderPolyResults(list){
@@ -1869,13 +1907,22 @@ function updatePolyCredit(){
   if(!el) return;
   const m=currentPolyModel;
   if(!m){ el.textContent=''; return; }
+  const src = m.source || 'the model library';
   if(m.attribution){ el.textContent='Credit: '+m.attribution; return; }
   if(m.license && m.license.toUpperCase()!=='CC0' && m.author){
-    el.textContent=`Credit: "${m.title}" by ${m.author} (${m.license}) — via Poly Pizza`;
+    el.textContent=`Credit: "${m.title}" by ${m.author} (${m.license}) — via ${src}`;
   }else{
-    el.textContent=`"${m.title}" — via Poly Pizza (${m.license||'CC0'})`;
+    el.textContent=`"${m.title}" — via ${src} (${m.license||'CC0'})`;
   }
 }
+document.querySelectorAll('.src-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    currentSearchSource = btn.dataset.src;
+    document.querySelectorAll('.src-btn').forEach(b=>b.classList.toggle('active', b===btn));
+    document.getElementById('poly-search-results').innerHTML='';
+    document.getElementById('poly-search-status').textContent='';
+  });
+});
 document.getElementById('poly-search-btn').addEventListener('click', async ()=>{
   const q=document.getElementById('poly-search-input').value.trim();
   const statusEl=document.getElementById('poly-search-status');
@@ -1883,8 +1930,9 @@ document.getElementById('poly-search-btn').addEventListener('click', async ()=>{
   statusEl.textContent='searching...';
   document.getElementById('poly-search-results').innerHTML='';
   try{
-    const list=await searchPolyPizzaModels(q);
-    statusEl.textContent = list.length ? `${list.length} result(s)` : 'no results found.';
+    const list = currentSearchSource==='icosa' ? await searchIcosaModels(q) : await searchPolyPizzaModels(q);
+    const sourceLabel = currentSearchSource==='icosa' ? 'Icosa Gallery' : 'Poly Pizza';
+    statusEl.textContent = list.length ? `${list.length} result(s) from ${sourceLabel}` : `no results found on ${sourceLabel}.`;
     renderPolyResults(list);
   }catch(e){
     console.error(e);
