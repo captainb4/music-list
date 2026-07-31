@@ -1637,7 +1637,7 @@ function updateViz(){
 //  VOXEL RENDERER (2D Canvas / isometric)
 // ═══════════════════════════════════════════════════════════
 const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
-let view={rotX:-.45,rotY:.6,zoom:1,panX:0,panY:0},drag=null,lastT=0;
+let view={rotX:-1.0,rotY:.6,zoom:.45,panX:0,panY:0},drag=null,lastT=0;
 
 function resizeCvs(){
   const dpr=window.devicePixelRatio||1,r=canvas.parentElement.getBoundingClientRect();
@@ -2050,7 +2050,7 @@ canvas.addEventListener('mousemove',e=>{
 });
 canvas.addEventListener('mouseup',()=>drag=null);
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
-canvas.addEventListener('wheel',e=>{e.preventDefault();view.zoom*=e.deltaY>0?.93:1.07;view.zoom=Math.max(.1,Math.min(8,view.zoom));},{passive:false});
+canvas.addEventListener('wheel',e=>{e.preventDefault();view.zoom*=e.deltaY>0?.93:1.07;view.zoom=Math.max(.05,Math.min(8,view.zoom));},{passive:false});
 
 // ═══════════════════════════════════════════════════════════
 //  UI BINDINGS
