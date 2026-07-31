@@ -284,6 +284,7 @@ header{flex:0 0 auto}
         <button class="rail-item active" data-page="home"><span class="rail-icon">⌂</span><span class="rail-label">Home</span></button>
         <button class="rail-item" data-page="add"><span class="rail-icon">+</span><span class="rail-label">Add Album</span></button>
         <button class="rail-item" data-page="playlists"><span class="rail-icon">☰</span><span class="rail-label">Playlists</span></button>
+        <button class="rail-item" data-page="community"><span class="rail-icon">◎</span><span class="rail-label">Community</span></button>
         <button class="rail-item" data-page="local"><span class="rail-icon">♪</span><span class="rail-label">Local Files</span></button>
         <button class="rail-item" data-page="youtube"><span class="rail-icon">▶</span><span class="rail-label">YouTube</span></button>
         <button class="rail-item" data-page="account"><span class="rail-icon">◇</span><span class="rail-label">Account</span></button>
@@ -325,16 +326,26 @@ header{flex:0 0 auto}
 
       <!-- PLAYLISTS -->
       <section class="page" id="page-playlists">
-        <div class="page-head"><h1>Your Playlists</h1><span class="page-sub">private to your account</span></div>
+        <div class="page-head"><h1>Your Playlists</h1><span class="page-sub">private by default — mark one public to share it (and its presets) with everyone</span></div>
         <div class="panel">
           <div id="playlists-locked" class="lib-status" style="margin-top:0">sign in to create playlists.</div>
           <div id="playlists-area" style="display:none">
             <div class="playlist-list" id="playlist-list"></div>
-            <div style="display:flex;gap:6px;margin-top:8px">
+            <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
               <input type="text" id="new-playlist-name" class="lib-input" placeholder="new playlist name...">
+              <label class="toggle" title="make public"><input type="checkbox" id="new-playlist-public"><div class="ttrack"></div></label>
               <button class="lib-btn" id="new-playlist-btn" style="width:auto;padding:7px 10px;margin-top:0">+</button>
             </div>
+            <div class="lib-status" style="margin-top:4px">toggle next to the name box makes a new playlist public</div>
           </div>
+        </div>
+      </section>
+
+      <!-- COMMUNITY -->
+      <section class="page" id="page-community">
+        <div class="page-head"><h1>Community</h1><span class="page-sub">public playlists other people have shared, with their visualizer presets</span></div>
+        <div class="panel">
+          <div class="playlist-list" id="community-list"></div>
         </div>
       </section>
 
@@ -369,7 +380,7 @@ header{flex:0 0 auto}
 
       <!-- ACCOUNT -->
       <section class="page" id="page-account">
-        <div class="page-head"><h1>Account</h1><span class="page-sub">albums you add are shared with everyone · playlists are private</span></div>
+        <div class="page-head"><h1>Account</h1><span class="page-sub">albums you add are shared with everyone · playlists are private unless you mark them public</span></div>
         <div class="panel">
           <div id="account-logged-out">
             <div class="lib-field">
@@ -389,7 +400,7 @@ header{flex:0 0 auto}
           <div id="account-logged-in" style="display:none">
             <div class="lib-status" style="margin-top:0">signed in as <span id="account-username-display"></span><span id="account-admin-badge" style="display:none;color:var(--accent);border:1px solid var(--accent);padding:1px 5px;border-radius:2px;font-size:9px;letter-spacing:1px;margin-left:6px">ADMIN</span></div>
             <button class="lib-btn" id="account-logout-btn">LOG OUT</button>
-            <div class="lib-status">albums you add are shared with everyone. playlists are private to your account.</div>
+            <div class="lib-status">albums you add are shared with everyone. playlists are private unless you mark them public.</div>
           </div>
         </div>
       </section>
@@ -456,9 +467,22 @@ header{flex:0 0 auto}
               <div class="color-row"><span class="ctrl-label">Custom High</span><input type="color" id="col-hi" value="#ff4466"></div>
             </div>
           </div>
+          <!-- PRESETS FOR THE CURRENT ALBUM/PLAYLIST (account-based, shareable) -->
+          <div class="panel" id="cloud-preset-panel" style="display:none">
+            <div class="panel-title">Presets for "<span id="cloud-preset-context-name" style="color:var(--accent)"></span>"</div>
+            <div class="playlist-list" id="cloud-preset-list"></div>
+            <div id="cloud-preset-save-area" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+              <div class="lib-field" style="margin-bottom:6px">
+                <input type="text" id="cloud-preset-name" class="lib-input" placeholder="name this preset...">
+              </div>
+              <button class="lib-btn" id="cloud-preset-save-btn" style="margin-top:0">PUBLISH PRESET</button>
+              <div class="lib-status" id="cloud-preset-status"></div>
+            </div>
+          </div>
           <!-- PRESETS -->
           <div class="panel">
-            <div class="panel-title">Presets</div>
+            <div class="panel-title">Device Presets</div>
+            <div class="lib-status" style="margin-top:0">saved only in this browser — not shared with anyone</div>
             <div class="lib-field" style="margin-bottom:6px">
               <input type="text" id="preset-name" class="lib-input" placeholder="preset name...">
             </div>
@@ -479,10 +503,16 @@ header{flex:0 0 auto}
             <div class="color-row"><span class="ctrl-label">Background</span><input type="color" id="col-bg" value="#0d0f0b"></div>
 
             <div class="panel-title" style="color:var(--accent3);margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">3D Model</div>
-            <div class="model-dz" id="model-dz">
+            <div class="lib-field" style="margin-bottom:6px">
+              <input type="text" id="poly-search-input" class="lib-input" placeholder="search free models (e.g. skull, car, tree)...">
+            </div>
+            <button class="lib-btn" id="poly-search-btn" style="margin-top:0;border-color:var(--accent3);color:var(--accent3)">SEARCH FREE MODELS</button>
+            <div class="lib-status" id="poly-search-status"></div>
+            <div id="poly-search-results" style="margin-top:6px"></div>
+            <div class="model-dz" id="model-dz" style="margin-top:10px">
               <input type="file" id="model-input" accept=".obj,.glb,.gltf">
               <span class="drop-icon" style="color:var(--accent3)">[◈]</span>
-              <div class="drop-text">Drop <strong style="color:var(--accent3)">.obj .glb .gltf</strong><br>model distorts to the music</div>
+              <div class="drop-text">or drop your own <strong style="color:var(--accent3)">.obj .glb .gltf</strong></div>
             </div>
             <div class="model-info" id="model-info"></div>
             <div id="model-ctrl">
@@ -908,6 +938,7 @@ function ytRemove(i){
 const SUPABASE_URL = 'https://eepyrwxplzgvxfwmtjsv.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_HfKPjZSEQ31YJBQqdDaEXQ_l4_PhK53';
 const YT_API_KEY = 'AIzaSyCVL0aQbZKcBXJ6ueB-j-2zQ1HquZaqYRw'; // Google Cloud Console → enable "YouTube Data API v3" → Credentials → API key
+const POLY_PIZZA_API_KEY = 'd385ea0cd5bb4dd7bdcf5652554311a4'; // poly.pizza/settings/api — free CC0/CC-BY low-poly model search
 const CONFIGURED = !SUPABASE_URL.startsWith('YOUR_') && !SUPABASE_KEY.startsWith('YOUR_');
 const YT_SEARCH_CONFIGURED = !YT_API_KEY.startsWith('YOUR_');
 const sb = CONFIGURED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
@@ -937,6 +968,8 @@ let libAlbums = [];        // {id,title,artist,artwork_url,release_date,genre,ad
 let libPlaylists = [];     // {id,name,playlist_tracks:[{id,position,tracks:{...,albums:{...}}}]}
 let libSearchTerm = '';
 let libActiveAlbumId = null;
+let currentPlayContext = null; // {type:'album'|'playlist', id, name} — set when an album/playlist modal is opened; used to attach cloud presets
+let currentPolyModel = null;   // {title,thumbnail,downloadUrl,license,author} if the loaded 3D model came from Poly Pizza search — cleared on local upload/remove
 
 // ---- YouTube album search (search for full-album playlists) ----
 async function searchYouTubeAlbums(term){
@@ -1097,7 +1130,8 @@ function wireMtrackRow(rowEl, track, queueList, opts){
       if(val === '__new__'){
         const name = prompt('Name your new playlist:');
         if(!name || !name.trim()) return;
-        const pl = await createLibPlaylist(name.trim());
+        const isPublic = confirm('Make this playlist public so others can see it (and any presets made for it)?\n\nOK = public, Cancel = private');
+        const pl = await createLibPlaylist(name.trim(), isPublic);
         if(pl) await addTrackToLibPlaylist(pl.id, track.id);
       } else {
         await addTrackToLibPlaylist(Number(val), track.id);
@@ -1112,6 +1146,8 @@ function openAlbumModal(albumId){
   const album = libAlbums.find(a=>a.id===albumId);
   if(!album) return;
   libActiveAlbumId = albumId; renderLibAlbumList();
+  currentPlayContext = {type:'album', id:album.id, name:album.title};
+  loadContextPresets();
   document.getElementById('modal-art').src = album.artwork_url || '';
   document.getElementById('modal-title').textContent = album.title;
   document.getElementById('modal-artist').textContent = album.artist;
@@ -1122,9 +1158,12 @@ function openAlbumModal(albumId){
   const canManage = !!(libCurrentUser && (album.added_by === libCurrentUser.id || libIsAdmin));
   const delBtn = document.getElementById('modal-delete');
   delBtn.style.display = canManage ? 'inline-block' : 'none';
+  delBtn.textContent = 'DELETE ALBUM';
   delBtn.onclick = ()=> deleteLibAlbum(album.id);
   const editBtn = document.getElementById('modal-edit');
   editBtn.style.display = canManage ? 'inline-block' : 'none';
+  editBtn.style.borderColor = 'var(--accent3)'; editBtn.style.color = 'var(--accent3)';
+  editBtn.textContent = '✎ EDIT ALBUM';
   editBtn.onclick = ()=> editLibAlbum(album.id);
 
   const queueList = album.tracks.map(t => ({...t, albums: {title:album.title, artist:album.artist, artwork_url:album.artwork_url}}));
@@ -1246,7 +1285,7 @@ function renderLibPlaylists(){
   else {
     listEl.innerHTML = libPlaylists.map(p=>`
       <div class="playlist-item" data-playlist-id="${p.id}">
-        <span class="playlist-name">${esc(p.name)}</span>
+        <span class="playlist-name">${esc(p.name)} ${p.is_public?'<span style="color:var(--accent);opacity:.8" title="public">●</span>':''}</span>
         <span class="lib-album-count">${p.playlist_tracks.length}</span>
         <span class="playlist-del" data-action="del" title="delete playlist">✕</span>
       </div>`).join('');
@@ -1259,8 +1298,8 @@ function renderLibPlaylists(){
     });
   }
 }
-async function createLibPlaylist(name){
-  const { data, error } = await sb.from('playlists').insert({ user_id: libCurrentUser.id, name }).select().single();
+async function createLibPlaylist(name, isPublic){
+  const { data, error } = await sb.from('playlists').insert({ user_id: libCurrentUser.id, name, is_public: !!isPublic }).select().single();
   if(error){ console.error(error); alert('could not create playlist — check console.'); return null; }
   await loadLibPlaylists();
   return data;
@@ -1284,26 +1323,58 @@ async function removeFromLibPlaylist(playlistTrackId, playlistId){
   await loadLibPlaylists();
   openPlaylistModal(playlistId);
 }
-function openPlaylistModal(id){
-  const p = libPlaylists.find(x=>x.id===id);
-  if(!p) return;
+async function openPlaylistModal(id, foreignData){
+  let p = libPlaylists.find(x=>x.id===id);
+  const isOwner = !!p;
+  if(!p){
+    // Not one of ours — either passed in from the Community list, or opened by id directly.
+    if(foreignData){ p = foreignData; }
+    else{
+      const { data, error } = await sb.from('playlists')
+        .select('*, profiles(username), playlist_tracks(id, position, tracks(*, albums(id,title,artist,artwork_url)))')
+        .eq('id', id).single();
+      if(error || !data){ console.error(error); alert('could not load that playlist — it may be private.'); return; }
+      p = { ...data, playlist_tracks: (data.playlist_tracks||[]).sort((a,b)=>(a.position||0)-(b.position||0)) };
+    }
+  }
+  currentPlayContext = {type:'playlist', id:p.id, name:p.name};
+  loadContextPresets();
   document.getElementById('modal-art').src = '';
   document.getElementById('modal-title').textContent = p.name;
-  document.getElementById('modal-artist').textContent = `${p.playlist_tracks.length} track(s) · your playlist`;
+  document.getElementById('modal-artist').textContent = isOwner
+    ? `${p.playlist_tracks.length} track(s) · your playlist · ${p.is_public?'public':'private'}`
+    : `${p.playlist_tracks.length} track(s) · by ${esc(p.profiles?.username||'someone')}`;
   document.getElementById('modal-tags').innerHTML = '';
-  document.getElementById('modal-delete').style.display = 'none';
+  const delBtn = document.getElementById('modal-delete');
+  const editBtn = document.getElementById('modal-edit');
+  if(isOwner){
+    delBtn.style.display = 'inline-block'; delBtn.textContent = 'DELETE PLAYLIST';
+    delBtn.onclick = ()=>{ deleteLibPlaylist(p.id); document.getElementById('album-modal').classList.remove('open'); };
+    editBtn.style.display = 'inline-block';
+    editBtn.style.borderColor = 'var(--accent)'; editBtn.style.color = 'var(--accent)';
+    editBtn.textContent = p.is_public ? '● PUBLIC (make private)' : '○ PRIVATE (make public)';
+    editBtn.onclick = ()=> togglePlaylistPublic(p.id, p.is_public);
+  } else {
+    delBtn.style.display = 'none'; editBtn.style.display = 'none';
+  }
   const queueList = p.playlist_tracks.map(pt => ({ ...pt.tracks, _ptId: pt.id, albums: pt.tracks.albums }));
   const listEl = document.getElementById('modal-tracklist');
   if(queueList.length === 0){ listEl.innerHTML = '<div class="empty-note">empty — add tracks from any album\'s track list</div>'; }
   else{
-    listEl.innerHTML = queueList.map(t => mtrackRowHtml(t, {showNum:false, showThumb:true, showArtist:true, removeBtn:true})).join('');
+    listEl.innerHTML = queueList.map(t => mtrackRowHtml(t, {showNum:false, showThumb:true, showArtist:true, removeBtn:isOwner})).join('');
     listEl.querySelectorAll('.mtrack-row').forEach((row,i)=>{
       const t = queueList[i];
-      wireMtrackRow(row, t, queueList, { removeBtn:true, onRemove: ()=> removeFromLibPlaylist(t._ptId, id) });
+      wireMtrackRow(row, t, queueList, { removeBtn:isOwner, onRemove: ()=> removeFromLibPlaylist(t._ptId, p.id) });
     });
   }
   document.getElementById('modal-play-all').onclick = ()=> playLibQueue(queueList, 0);
   document.getElementById('album-modal').classList.add('open');
+}
+async function togglePlaylistPublic(id, current){
+  const { error } = await sb.from('playlists').update({ is_public: !current }).eq('id', id);
+  if(error){ console.error(error); alert('could not update — check console.'); return; }
+  await loadLibPlaylists();
+  openPlaylistModal(id);
 }
 
 // ---- library playback: feeds the existing YouTube engine. Tracks are imported
@@ -1380,10 +1451,11 @@ document.getElementById('album-search-btn').addEventListener('click', doAlbumSea
 document.getElementById('album-search-input').addEventListener('keydown', e=>{ if(e.key==='Enter') doAlbumSearch(); });
 document.getElementById('new-playlist-btn').addEventListener('click', async ()=>{
   const input = document.getElementById('new-playlist-name');
+  const pubBox = document.getElementById('new-playlist-public');
   const name = input.value.trim();
   if(!name) return;
-  await createLibPlaylist(name);
-  input.value = '';
+  await createLibPlaylist(name, pubBox.checked);
+  input.value = ''; pubBox.checked = false;
 });
 document.getElementById('account-signup-btn').addEventListener('click', handleLibSignUp);
 document.getElementById('account-login-btn').addEventListener('click', handleLibLogIn);
@@ -1391,6 +1463,13 @@ document.getElementById('account-logout-btn').addEventListener('click', handleLi
 [document.getElementById('account-username'), document.getElementById('account-password')].forEach(el=>{
   el.addEventListener('keydown', e=>{ if(e.key === 'Enter') handleLibLogIn(); });
 });
+
+async function ensureProfileUsername(){
+  if(!libCurrentUser) return;
+  const { error } = await sb.from('profiles')
+    .upsert({ id: libCurrentUser.id, username: authEmailToUsername(libCurrentUser.email) }, { onConflict: 'id' });
+  if(error) console.error('could not set profile username', error);
+}
 
 (async function initLibrary(){
   if(!CONFIGURED) return;
@@ -1400,8 +1479,9 @@ document.getElementById('account-logout-btn').addEventListener('click', handleLi
   updateLibAccountUI();
   await loadLibAlbums();
   await loadLibPlaylists();
+  if(libCurrentUser) ensureProfileUsername();
   sb.auth.onAuthStateChange(async (event, session)=>{
-    if(event === 'SIGNED_IN'){ libCurrentUser = session.user; await refreshLibAdminStatus(); updateLibAccountUI(); loadLibPlaylists(); renderLibAlbumList(); }
+    if(event === 'SIGNED_IN'){ libCurrentUser = session.user; await refreshLibAdminStatus(); updateLibAccountUI(); loadLibPlaylists(); renderLibAlbumList(); ensureProfileUsername(); }
     else if(event === 'SIGNED_OUT'){ libCurrentUser = null; libIsAdmin = false; updateLibAccountUI(); loadLibPlaylists(); renderLibAlbumList(); document.getElementById('album-modal').classList.remove('open'); }
   });
 })();
@@ -1647,6 +1727,7 @@ function onModelLoaded(obj,fname){
 
 function loadModel(file){
   if(!threeR)initThree();
+  currentPolyModel = null;
   const url=URL.createObjectURL(file),ext=file.name.split('.').pop().toLowerCase();
   if(ext==='glb'||ext==='gltf'){
     if(!THREE.GLTFLoader){alert('GLTFLoader not available. Check internet connection.');return;}
@@ -1656,9 +1737,87 @@ function loadModel(file){
     new THREE.OBJLoader().load(url,o=>onModelLoaded(o,file.name),null,()=>alert('Failed to load OBJ.'));
   }else alert('Unsupported. Use .obj, .glb, or .gltf');
 }
+// Same pipeline as loadModel(), but for a model fetched by URL (used by the
+// Poly Pizza search results) instead of a local File.
+function loadModelFromUrl(url,label,ext){
+  if(!threeR)initThree();
+  ext=(ext||url.split('?')[0].split('.').pop()||'').toLowerCase();
+  const statusEl=document.getElementById('poly-search-status');
+  if(ext==='glb'||ext==='gltf'){
+    if(!THREE.GLTFLoader){alert('GLTFLoader not available. Check internet connection.');return;}
+    new THREE.GLTFLoader().load(url,g=>{onModelLoaded(g.scene,label);if(statusEl)statusEl.textContent=`loaded "${label}".`;},null,
+      ()=>{ if(statusEl) statusEl.textContent='could not load that model (its host may not allow direct downloads from a browser). try another.'; });
+  }else if(ext==='obj'){
+    if(!THREE.OBJLoader){alert('OBJLoader not available. Check internet connection.');return;}
+    new THREE.OBJLoader().load(url,o=>{onModelLoaded(o,label);if(statusEl)statusEl.textContent=`loaded "${label}".`;},null,
+      ()=>{ if(statusEl) statusEl.textContent='could not load that model (its host may not allow direct downloads from a browser). try another.'; });
+  }else{
+    if(statusEl) statusEl.textContent=`unsupported file type "${ext}" for that model.`;
+  }
+}
+
+// ---- Poly Pizza model search (free CC0/CC-BY low-poly models) ----
+async function searchPolyPizzaModels(query){
+  const res=await fetch(`https://api.poly.pizza/search/${encodeURIComponent(query)}?results=15`, {
+    headers:{ 'x-auth-token': POLY_PIZZA_API_KEY }
+  });
+  if(!res.ok) throw new Error('Poly Pizza search failed ('+res.status+')');
+  const data=await res.json();
+  // Field names aren't fully confirmed against the (bot-protected) official docs —
+  // this defensively checks a few likely key spellings and logs the raw response
+  // so it's easy to fix mapping later if a field comes back empty.
+  const list=Array.isArray(data)?data:(data.results||data.Results||data.models||[]);
+  console.log('Poly Pizza raw response:', data);
+  return list.map(m=>({
+    title: m.Title||m.title||m.name||m.Name||'untitled',
+    thumbnail: m.Thumbnail||m.thumbnail||m.thumbnailUrl||m.image||m.Image||'',
+    downloadUrl: m.Download||m.download||m.downloadUrl||m.DownloadUrl||m.glb||m.Url||m.url||m.ModelUrl||'',
+    license: m.License||m.license||'',
+    author: (m.Attribution&&(m.Attribution.Name||m.Attribution.name))||m.author||m.Author||m.username||''
+  })).filter(m=>m.downloadUrl);
+}
+function renderPolyResults(list){
+  const el=document.getElementById('poly-search-results');
+  if(!list.length){ el.innerHTML=''; return; }
+  el.innerHTML=list.map((m,i)=>`
+    <div class="sr-item" data-index="${i}">
+      <img src="${escAttr(m.thumbnail)}">
+      <div class="sr-meta">
+        <div class="sr-title">${esc(m.title)}</div>
+        <div class="sr-sub">${esc(m.license)}${m.author?' · '+esc(m.author):''}</div>
+      </div>
+      <button class="sr-add" data-action="use">USE</button>
+    </div>`).join('');
+  el.querySelectorAll('.sr-item').forEach(item=>{
+    const m=list[Number(item.dataset.index)];
+    item.querySelector('.sr-add').addEventListener('click', ()=>{
+      const statusEl=document.getElementById('poly-search-status');
+      statusEl.textContent=`loading "${m.title}"...`;
+      const credit = m.license && m.license.toUpperCase()!=='CC0' && m.author ? ` — credit: ${m.title} by ${m.author} (${m.license})` : '';
+      currentPolyModel = m;
+      loadModelFromUrl(m.downloadUrl, m.title+credit);
+    });
+  });
+}
+document.getElementById('poly-search-btn').addEventListener('click', async ()=>{
+  const q=document.getElementById('poly-search-input').value.trim();
+  const statusEl=document.getElementById('poly-search-status');
+  if(!q){ statusEl.textContent='type something to search for.'; return; }
+  statusEl.textContent='searching...';
+  document.getElementById('poly-search-results').innerHTML='';
+  try{
+    const list=await searchPolyPizzaModels(q);
+    statusEl.textContent = list.length ? `${list.length} result(s)` : 'no results found.';
+    renderPolyResults(list);
+  }catch(e){
+    console.error(e);
+    statusEl.textContent='search failed — check console for details.';
+  }
+});
 
 function removeModel(){
   if(modelRoot){threeS.remove(modelRoot);modelRoot=null;}modelMeshes=[];
+  currentPolyModel = null;
   document.getElementById('three-canvas').style.display='none';
   document.getElementById('model-ctrl').style.display='none';
   document.getElementById('model-info').style.display='none';
@@ -1808,6 +1967,101 @@ document.getElementById('preset-save-btn').addEventListener('click', ()=>{
 renderPresetList();
 
 // ═══════════════════════════════════════════════════════════
+//  CLOUD PRESETS — tied to an album or playlist, saved to the
+//  account system so others can see them (per playlist/album
+//  visibility rules — see loadContextPresets)
+// ═══════════════════════════════════════════════════════════
+let cloudPresets = [];
+async function loadContextPresets(){
+  const wrap=document.getElementById('cloud-preset-panel');
+  const el=document.getElementById('cloud-preset-list');
+  const saveArea=document.getElementById('cloud-preset-save-area');
+  if(!wrap||!el) return;
+  if(!currentPlayContext || !CONFIGURED){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  document.getElementById('cloud-preset-context-name').textContent = currentPlayContext.name;
+  saveArea.style.display = libCurrentUser ? 'block' : 'none';
+  const col = currentPlayContext.type==='album' ? 'album_id' : 'playlist_id';
+  const { data, error } = await sb.from('presets')
+    .select('*, profiles(username)')
+    .eq(col, currentPlayContext.id)
+    .order('created_at', {ascending:false});
+  if(error){ console.error(error); el.innerHTML='<div class="empty-note">could not load presets — check console.</div>'; return; }
+  cloudPresets = data||[];
+  if(!cloudPresets.length){ el.innerHTML='<div class="empty-note">no presets yet for this one — be the first!</div>'; return; }
+  el.innerHTML = cloudPresets.map((p,i)=>`
+    <div class="playlist-item" data-index="${i}">
+      <span class="playlist-name">${esc(p.name)} <span style="opacity:.6;font-size:9px">— by ${esc(p.profiles?.username||'someone')}</span></span>
+      <span class="preset-load" data-action="load" title="load preset">▶</span>
+      ${libCurrentUser && p.user_id===libCurrentUser.id ? '<span class="playlist-del" data-action="del" title="delete preset">✕</span>' : ''}
+    </div>`).join('');
+  el.querySelectorAll('.playlist-item').forEach(item=>{
+    const p=cloudPresets[Number(item.dataset.index)];
+    item.addEventListener('click', e=>{
+      const action=e.target.dataset.action;
+      if(action==='del'){
+        e.stopPropagation();
+        if(!confirm(`Delete your preset "${p.name}"?`))return;
+        sb.from('presets').delete().eq('id',p.id).then(({error})=>{ if(error)console.error(error); loadContextPresets(); });
+      } else {
+        applyVizSettings(p.settings);
+        if(p.poly_model && p.poly_model.downloadUrl){
+          currentPolyModel = p.poly_model;
+          loadModelFromUrl(p.poly_model.downloadUrl, p.poly_model.title);
+        }
+        document.getElementById('cloud-preset-status').textContent = `loaded "${p.name}" by ${esc(p.profiles?.username||'someone')}.`;
+      }
+    });
+  });
+}
+document.getElementById('cloud-preset-save-btn').addEventListener('click', async ()=>{
+  const nameEl=document.getElementById('cloud-preset-name');
+  const statusEl=document.getElementById('cloud-preset-status');
+  if(!libCurrentUser){ statusEl.textContent='sign in to publish a preset.'; return; }
+  if(!currentPlayContext){ statusEl.textContent='open an album or playlist first.'; return; }
+  const name=nameEl.value.trim();
+  if(!name){ statusEl.textContent='give your preset a name.'; return; }
+  const row = {
+    user_id: libCurrentUser.id, name,
+    album_id: currentPlayContext.type==='album' ? currentPlayContext.id : null,
+    playlist_id: currentPlayContext.type==='playlist' ? currentPlayContext.id : null,
+    settings: collectVizSettings(),
+    poly_model: currentPolyModel || null
+  };
+  const { error } = await sb.from('presets').insert(row);
+  if(error){ console.error(error); statusEl.textContent='could not publish — check console.'; return; }
+  statusEl.textContent=`published "${name}".`; nameEl.value='';
+  loadContextPresets();
+});
+
+// ═══════════════════════════════════════════════════════════
+//  COMMUNITY — browse other people's public playlists
+// ═══════════════════════════════════════════════════════════
+async function loadPublicPlaylists(){
+  const el=document.getElementById('community-list');
+  if(!el || !CONFIGURED) return;
+  el.innerHTML='<div class="empty-note">loading...</div>';
+  const { data, error } = await sb.from('playlists')
+    .select('*, profiles(username), playlist_tracks(count)')
+    .eq('is_public', true)
+    .order('created_at', {ascending:false})
+    .limit(50);
+  if(error){ console.error(error); el.innerHTML='<div class="empty-note">could not load — check console.</div>'; return; }
+  if(!data || !data.length){ el.innerHTML='<div class="empty-note">no public playlists yet — be the first to share one!</div>'; return; }
+  el.innerHTML = data.map((p,i)=>`
+    <div class="playlist-item" data-index="${i}">
+      <span class="playlist-name">${esc(p.name)} <span style="opacity:.6;font-size:9px">— by ${esc(p.profiles?.username||'someone')}</span></span>
+      <span class="lib-album-count">${(p.playlist_tracks&&p.playlist_tracks[0]&&p.playlist_tracks[0].count)||0}</span>
+    </div>`).join('');
+  el.querySelectorAll('.playlist-item').forEach(item=>{
+    const p=data[Number(item.dataset.index)];
+    item.addEventListener('click', ()=> openPlaylistModal(p.id));
+  });
+}
+const communityNavBtn=document.querySelector('.rail-item[data-page="community"]');
+if(communityNavBtn) communityNavBtn.addEventListener('click', loadPublicPlaylists);
+
+// ═══════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════
 buildSchemeGrid();
@@ -1849,6 +2103,7 @@ requestAnimationFrame(renderFrame);
     // was sized 0x0 on page load — force a real resize now that it's visible.
     if(typeof resizeCvs==='function')resizeCvs();
     window.dispatchEvent(new Event('resize')); // also resizes the three.js renderer if a 3D model is loaded
+    if(typeof loadContextPresets==='function')loadContextPresets();
   };
   window.closeNowPlaying=function(){overlay.classList.remove('open');expandBtn.classList.remove('active');expandBtn.textContent='▲ Visualizer';};
   expandBtn.addEventListener('click',()=>{overlay.classList.contains('open')?closeNowPlaying():openNowPlaying();});
