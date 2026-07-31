@@ -2042,7 +2042,7 @@ async function loadPublicPlaylists(){
   if(!el || !CONFIGURED) return;
   el.innerHTML='<div class="empty-note">loading...</div>';
   const { data, error } = await sb.from('playlists')
-    .select('*, profiles(username), playlist_tracks(count)')
+    .select('*, profiles(username), playlist_tracks(count())')
     .eq('is_public', true)
     .order('created_at', {ascending:false})
     .limit(50);
