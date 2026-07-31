@@ -144,6 +144,8 @@ input[type=color]::-webkit-color-swatch-wrapper{padding:0}input[type=color]::-we
 .lib-album-count{font-family:'VT323',monospace;font-size:12px;color:var(--muted)}
 .playlist-del{opacity:0;font-size:11px;color:var(--accent2)}
 .playlist-item:hover .playlist-del{opacity:1}
+.preset-load{opacity:0;font-size:11px;color:var(--accent)}
+.playlist-item:hover .preset-load{opacity:1}
 .empty-note{font-size:10px;color:var(--muted);font-style:italic;padding:2px 0}
 /* modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(3px);display:none;align-items:flex-start;justify-content:center;z-index:1000;padding:40px 16px;overflow-y:auto}
@@ -454,7 +456,17 @@ header{flex:0 0 auto}
               <div class="color-row"><span class="ctrl-label">Custom High</span><input type="color" id="col-hi" value="#ff4466"></div>
             </div>
           </div>
-          <!-- RENDER -->
+          <!-- PRESETS -->
+          <div class="panel">
+            <div class="panel-title">Presets</div>
+            <div class="lib-field" style="margin-bottom:6px">
+              <input type="text" id="preset-name" class="lib-input" placeholder="preset name...">
+            </div>
+            <button class="lib-btn" id="preset-save-btn" style="margin-top:0">SAVE CURRENT SETTINGS</button>
+            <div class="lib-status" id="preset-status"></div>
+            <div class="playlist-list" id="preset-list" style="margin-top:6px"></div>
+          </div>
+          <!-- RENDER (grid render options + 3D model, all in one place) -->
           <div class="panel">
             <div class="panel-title">Render</div>
             <div class="toggle-row"><span class="ctrl-label">Auto-Rotate</span><label class="toggle"><input type="checkbox" id="auto-rot" checked><div class="ttrack"></div></label></div>
@@ -465,10 +477,8 @@ header{flex:0 0 auto}
             <div class="toggle-row"><span class="ctrl-label">Rainbow BG</span><label class="toggle"><input type="checkbox" id="rainbow-bg"><div class="ttrack"></div></label></div>
             <div class="control" style="margin-top:8px"><div class="ctrl-row"><span class="ctrl-label">Rotation Speed</span><span class="ctrl-val" id="val-rotspd">0.3</span></div><input type="range" id="rot-spd" min="0" max="2" value="0.3" step="0.05"></div>
             <div class="color-row"><span class="ctrl-label">Background</span><input type="color" id="col-bg" value="#0d0f0b"></div>
-          </div>
-          <!-- 3D MODEL -->
-          <div class="panel">
-            <div class="panel-title" style="color:var(--accent3)">3D Model</div>
+
+            <div class="panel-title" style="color:var(--accent3);margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">3D Model</div>
             <div class="model-dz" id="model-dz">
               <input type="file" id="model-input" accept=".obj,.glb,.gltf">
               <span class="drop-icon" style="color:var(--accent3)">[◈]</span>
@@ -1482,7 +1492,7 @@ function renderFrame(ts){
   }else ctx.fillStyle=document.getElementById('col-bg').value;
   ctx.fillRect(0,0,W,H);
 
-  if(!tracks.length&&!micActive)return;
+  if(!tracks.length&&!micActive&&!ytQ.length)return;
   const beatBoost=document.getElementById('beat-pulse').checked?beatFlash*.5:0;
   const cxg=gridW/2,cyg=0,czg=gridD/2,scale=Math.min(W,H)/(Math.max(gridW,gridH,gridD)*3.5)*view.zoom;
   const vs=Math.max(2,Math.round(scale*12*.7));
@@ -1700,6 +1710,104 @@ document.getElementById('glow-level').addEventListener('input',e=>{document.getE
 document.querySelectorAll('[data-viz]').forEach(b=>b.addEventListener('click',()=>{vizMode=b.dataset.viz;document.querySelectorAll('[data-viz]').forEach(x=>x.classList.remove('active'));b.classList.add('active');}));
 
 // ═══════════════════════════════════════════════════════════
+//  VISUALIZER PRESETS (saved locally in this browser)
+// ═══════════════════════════════════════════════════════════
+const PRESET_KEY='voxelbeat_presets';
+function loadPresetList(){ try{ return JSON.parse(localStorage.getItem(PRESET_KEY)||'[]'); }catch(e){ return []; } }
+function savePresetList(list){ try{ localStorage.setItem(PRESET_KEY, JSON.stringify(list)); return true; }catch(e){ console.error(e); return false; } }
+function collectVizSettings(){
+  return {
+    gridWd: document.getElementById('grid-wd').value, gridHt: document.getElementById('grid-ht').value,
+    sens: document.getElementById('sens').value, smooth: document.getElementById('smooth').value,
+    vizMode: vizMode, activeScheme: activeScheme,
+    colLo: document.getElementById('col-lo').value, colHi: document.getElementById('col-hi').value,
+    autoRot: document.getElementById('auto-rot').checked, beatPulse: document.getElementById('beat-pulse').checked,
+    useGlow: document.getElementById('use-glow').checked, glowLevel: document.getElementById('glow-level').value,
+    showFloor: document.getElementById('show-floor').checked, rainbowBg: document.getElementById('rainbow-bg').checked,
+    rotSpd: document.getElementById('rot-spd').value, colBg: document.getElementById('col-bg').value,
+    showModel: document.getElementById('show-model').checked, modelWire: document.getElementById('model-wire').checked,
+    distortAmt: document.getElementById('distort-amt').value, modelSize: document.getElementById('model-size').value,
+    modelOpacity: document.getElementById('model-opacity').value, emissiveAmt: document.getElementById('emissive-amt').value
+  };
+}
+function applyVizSettings(s){
+  if(!s) return;
+  const setRange=(id,val,labelId,fmt)=>{ if(val==null)return; document.getElementById(id).value=val; if(labelId)document.getElementById(labelId).textContent=fmt(+val); };
+  const setCheck=(id,val)=>{ if(val==null)return; document.getElementById(id).checked=!!val; };
+  setRange('grid-wd',s.gridWd,'val-wd',v=>v);
+  setRange('grid-ht',s.gridHt,'val-ht',v=>v);
+  setRange('sens',s.sens,'val-sens',v=>v.toFixed(1));
+  setRange('smooth',s.smooth,'val-smooth',v=>v.toFixed(2));
+  setRange('rot-spd',s.rotSpd,'val-rotspd',v=>v.toFixed(1));
+  setRange('glow-level',s.glowLevel,'val-glow',v=>v.toFixed(2));
+  setRange('distort-amt',s.distortAmt,'val-distort',v=>v.toFixed(2));
+  setRange('model-size',s.modelSize,'val-mscale',v=>v.toFixed(1));
+  setRange('model-opacity',s.modelOpacity,'val-mopacity',v=>v.toFixed(1));
+  setRange('emissive-amt',s.emissiveAmt,'val-emissive',v=>v.toFixed(1));
+  setCheck('auto-rot',s.autoRot); setCheck('beat-pulse',s.beatPulse); setCheck('use-glow',s.useGlow);
+  setCheck('show-floor',s.showFloor); setCheck('rainbow-bg',s.rainbowBg);
+  setCheck('show-model',s.showModel); setCheck('model-wire',s.modelWire);
+  if(s.colLo){ document.getElementById('col-lo').value=s.colLo; }
+  if(s.colHi){ document.getElementById('col-hi').value=s.colHi; }
+  if(s.colBg){ document.getElementById('col-bg').value=s.colBg; }
+  if(s.vizMode){
+    vizMode=s.vizMode;
+    document.querySelectorAll('[data-viz]').forEach(b=>b.classList.toggle('active', b.dataset.viz===vizMode));
+  }
+  if(s.activeScheme!=null){
+    activeScheme=s.activeScheme;
+    document.querySelectorAll('.scheme-btn').forEach((b,i)=>b.classList.toggle('active', i===activeScheme));
+  }
+  initGrid();
+  updateWire();
+  updateOpacity(document.getElementById('model-opacity').value);
+}
+function renderPresetList(){
+  const el=document.getElementById('preset-list');
+  const list=loadPresetList();
+  if(!list.length){ el.innerHTML='<div class="empty-note">no saved presets yet</div>'; return; }
+  el.innerHTML=list.map((p,i)=>`
+    <div class="playlist-item" data-index="${i}">
+      <span class="playlist-name">${esc(p.name)}</span>
+      <span class="preset-load" data-action="load" title="load preset">▶</span>
+      <span class="playlist-del" data-action="del" title="delete preset">✕</span>
+    </div>`).join('');
+  el.querySelectorAll('.playlist-item').forEach(item=>{
+    const i=Number(item.dataset.index);
+    item.addEventListener('click', e=>{
+      const action=e.target.dataset.action;
+      const list=loadPresetList();
+      if(action==='del'){
+        e.stopPropagation();
+        if(!confirm(`Delete preset "${list[i].name}"?`))return;
+        list.splice(i,1); savePresetList(list); renderPresetList();
+      } else {
+        applyVizSettings(list[i].settings);
+        document.getElementById('preset-status').textContent=`loaded "${list[i].name}"`;
+      }
+    });
+  });
+}
+document.getElementById('preset-save-btn').addEventListener('click', ()=>{
+  const nameEl=document.getElementById('preset-name');
+  const statusEl=document.getElementById('preset-status');
+  const name=nameEl.value.trim();
+  if(!name){ statusEl.textContent='give your preset a name first.'; return; }
+  const list=loadPresetList();
+  const settings=collectVizSettings();
+  const existingIdx=list.findIndex(p=>p.name===name);
+  if(existingIdx>=0){
+    if(!confirm(`A preset named "${name}" already exists — overwrite it?`))return;
+    list[existingIdx]={name,settings};
+  } else {
+    list.push({name,settings});
+  }
+  if(savePresetList(list)){ statusEl.textContent=`saved "${name}".`; nameEl.value=''; renderPresetList(); }
+  else statusEl.textContent='could not save — your browser storage may be full or disabled.';
+});
+renderPresetList();
+
+// ═══════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════
 buildSchemeGrid();
@@ -1717,7 +1825,13 @@ requestAnimationFrame(renderFrame);
 // ═══════════════════════════════════════════════════════════
 (function(){
   const rail=document.getElementById('rail');
-  document.getElementById('rail-toggle').addEventListener('click',()=>rail.classList.toggle('collapsed'));
+  const overlay=document.getElementById('now-playing-overlay');
+  document.getElementById('rail-toggle').addEventListener('click',()=>{
+    // The rail sits behind the full-screen visualizer overlay, so toggling it
+    // there is invisible — treat the button as "back to browse" instead.
+    if(overlay.classList.contains('open')) closeNowPlaying();
+    else rail.classList.toggle('collapsed');
+  });
 
   const pages=document.querySelectorAll('.page');
   const railItems=document.querySelectorAll('.rail-item[data-page]');
@@ -1727,7 +1841,6 @@ requestAnimationFrame(renderFrame);
   }
   railItems.forEach(b=>b.addEventListener('click',()=>{showPage(b.dataset.page);closeNowPlaying();}));
 
-  const overlay=document.getElementById('now-playing-overlay');
   const expandBtn=document.getElementById('pb-expand');
   const npSettings=document.getElementById('np-settings');
   window.openNowPlaying=function(){
