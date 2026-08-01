@@ -1103,13 +1103,25 @@ async function searchYouTubeAlbums(term){
 // Playlist titles are usually "Artist - Album Name" — split that out so the
 // artist field shows the band, not whichever channel uploaded it, and strip
 // the band name off the front of the album title.
+function cleanAlbumTitle(str){
+  return String(str || '')
+    // drop any (...), [...], or {...} group — "(Full Album)", "[HQ]", "(2013 Remaster)" etc.
+    .replace(/[\(\[\{][^\)\]\}]*[\)\]\}]/g, ' ')
+    // drop trailing "Full Album" / "Official Audio" style junk left without brackets
+    .replace(/\b(full\s*album|official\s*(audio|video|stream)?|full\s*stream|hd|hq|4k|lyric\s*video|with\s*lyrics|album\s*stream)\b/gi, ' ')
+    // tidy up leftover dashes/pipes/colons and whitespace
+    .replace(/[-–—|:]+\s*$/g, '')
+    .replace(/^\s*[-–—|:]+/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 function parseYouTubeAlbumTitle(rawTitle, channelTitle){
   const title = String(rawTitle || '').trim();
   const m = title.match(/^(.{1,60}?)\s*[-–—:]\s+(.+)$/);
   if(m && m[1].trim() && m[2].trim()){
-    return { artist: m[1].trim(), title: m[2].trim() };
+    return { artist: m[1].trim(), title: cleanAlbumTitle(m[2]) || m[2].trim() };
   }
-  return { artist: (channelTitle || '').trim(), title };
+  return { artist: (channelTitle || '').trim(), title: cleanAlbumTitle(title) || title };
 }
 // ---- YouTube playlist → tracklist (with per-video durations) ----
 function iso8601DurationToMs(dur){
