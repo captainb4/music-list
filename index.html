@@ -463,7 +463,7 @@ header{flex:0 0 auto}
               <button class="subtab-btn active" data-subtab="vizmode">Viz Mode</button>
               <button class="subtab-btn" data-subtab="colors">Colors</button>
               <button class="subtab-btn" data-subtab="voxelgrid">Voxel Grid</button>
-              <button class="subtab-btn" data-subtab="render">Render</button>
+              <button class="subtab-btn" data-subtab="model">3D Model</button>
             </div>
 
             <div class="subtab-pane active" data-subpane="vizmode">
@@ -485,6 +485,9 @@ header{flex:0 0 auto}
               </div>
             </div>
 
+            <!-- VOXEL GRID + CAMERA/RENDER — combined into one tab since they
+                 both shape the same voxel/camera view; no more hopping
+                 between two tabs to tweak one picture. -->
             <div class="subtab-pane" data-subpane="voxelgrid">
               <div class="toggle-row"><span class="ctrl-label">Show Voxel Grid</span><label class="toggle"><input type="checkbox" id="show-voxels" checked><div class="ttrack"></div></label></div>
               <div class="control"><div class="ctrl-row"><span class="ctrl-label">Grid Size</span><span class="ctrl-val" id="val-grid">16×8×16</span></div></div>
@@ -492,9 +495,7 @@ header{flex:0 0 auto}
               <div class="control"><div class="ctrl-row"><span class="ctrl-label">Max Height</span><span class="ctrl-val" id="val-ht">8</span></div><input type="range" id="grid-ht" min="4" max="32" value="8" step="1"></div>
               <div class="control"><div class="ctrl-row"><span class="ctrl-label">Sensitivity</span><span class="ctrl-val" id="val-sens">1.0</span></div><input type="range" id="sens" min="0.5" max="4" value="1.0" step="0.1"></div>
               <div class="control"><div class="ctrl-row"><span class="ctrl-label">Smoothing</span><span class="ctrl-val" id="val-smooth">0.85</span></div><input type="range" id="smooth" min="0.1" max="0.97" value="0.85" step="0.01"></div>
-            </div>
-
-            <div class="subtab-pane" data-subpane="render">
+              <div style="margin:14px 0 8px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;letter-spacing:1px;color:var(--muted)">CAMERA / RENDER</div>
               <div class="toggle-row"><span class="ctrl-label">Auto-Rotate</span><label class="toggle"><input type="checkbox" id="auto-rot" checked><div class="ttrack"></div></label></div>
               <div class="toggle-row"><span class="ctrl-label">Beat Pulse</span><label class="toggle"><input type="checkbox" id="beat-pulse" checked><div class="ttrack"></div></label></div>
               <div class="toggle-row"><span class="ctrl-label">Glow Effect</span><label class="toggle"><input type="checkbox" id="use-glow" checked><div class="ttrack"></div></label></div>
@@ -504,35 +505,47 @@ header{flex:0 0 auto}
               <div class="control" style="margin-top:8px"><div class="ctrl-row"><span class="ctrl-label">Rotation Speed</span><span class="ctrl-val" id="val-rotspd">0.3</span></div><input type="range" id="rot-spd" min="0" max="2" value="0.3" step="0.05"></div>
               <div class="color-row"><span class="ctrl-label">Background</span><input type="color" id="col-bg" value="#0d0f0b"></div>
             </div>
-          </div>
-          <!-- 3D MODEL — its own section, between the viz tabs and presets -->
-          <div class="panel">
-            <div class="panel-title" style="color:var(--accent3)">3D Model</div>
-            <div class="lib-field" style="margin-bottom:6px;display:flex;gap:6px">
-              <button class="lib-btn src-btn active" id="src-btn-polypizza" data-src="polypizza" style="margin-top:0;flex:1;padding:6px;font-size:9px">POLY PIZZA</button>
-              <button class="lib-btn src-btn" id="src-btn-icosa" data-src="icosa" style="margin-top:0;flex:1;padding:6px;font-size:9px">ICOSA GALLERY</button>
-            </div>
-            <div class="lib-field" style="margin-bottom:6px">
-              <input type="text" id="poly-search-input" class="lib-input" placeholder="search free models (e.g. skull, car, tree)...">
-            </div>
-            <button class="lib-btn" id="poly-search-btn" style="margin-top:0;border-color:var(--accent3);color:var(--accent3)">SEARCH FREE MODELS</button>
-            <div class="lib-status" id="poly-search-status"></div>
-            <div id="poly-search-results" style="margin-top:6px"></div>
-            <div class="lib-status" id="poly-model-credit" style="opacity:.7"></div>
-            <div class="model-dz" id="model-dz" style="margin-top:10px">
-              <input type="file" id="model-input" accept=".obj,.glb,.gltf">
-              <span class="drop-icon" style="color:var(--accent3)">[◈]</span>
-              <div class="drop-text">or drop your own <strong style="color:var(--accent3)">.obj .glb .gltf</strong></div>
-            </div>
-            <div class="model-info" id="model-info"></div>
-            <div id="model-ctrl">
-              <div class="toggle-row" style="margin-top:10px"><span class="ctrl-label">Show Model</span><label class="toggle"><input type="checkbox" id="show-model" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
-              <div class="toggle-row"><span class="ctrl-label">Wireframe</span><label class="toggle"><input type="checkbox" id="model-wire"><div class="ttrack"></div></label></div>
-              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Distortion</span><span class="ctrl-val" id="val-distort" style="color:var(--accent3)">0.50</span></div><input type="range" id="distort-amt" min="0" max="3" value="0.5" step="0.05"></div>
-              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Model Scale</span><span class="ctrl-val" id="val-mscale" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-size" min="0.2" max="5" value="1.0" step="0.1"></div>
-              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Opacity</span><span class="ctrl-val" id="val-mopacity" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-opacity" min="0.05" max="1" value="1.0" step="0.05"></div>
-              <div class="control"><div class="ctrl-row"><span class="ctrl-label">Emissive Boost</span><span class="ctrl-val" id="val-emissive" style="color:var(--accent3)">0.5</span></div><input type="range" id="emissive-amt" min="0" max="2" value="0.5" step="0.05"></div>
-              <button id="remove-model-btn" class="px-btn" style="width:100%;margin-top:4px;border-color:var(--accent2);color:var(--accent2)">✕ Remove Model</button>
+
+            <div class="subtab-pane" data-subpane="model">
+              <div class="lib-field" style="margin-bottom:6px;display:flex;gap:6px">
+                <button class="lib-btn src-btn active" id="src-btn-polypizza" data-src="polypizza" style="margin-top:0;flex:1;padding:6px;font-size:9px">POLY PIZZA</button>
+                <button class="lib-btn src-btn" id="src-btn-icosa" data-src="icosa" style="margin-top:0;flex:1;padding:6px;font-size:9px">ICOSA GALLERY</button>
+              </div>
+              <div class="lib-field" style="margin-bottom:6px">
+                <input type="text" id="poly-search-input" class="lib-input" placeholder="search free models (e.g. skull, car, tree)...">
+              </div>
+              <button class="lib-btn" id="poly-search-btn" style="margin-top:0;border-color:var(--accent3);color:var(--accent3)">SEARCH FREE MODELS</button>
+              <div class="lib-status" id="poly-search-status"></div>
+              <div id="poly-search-results" style="margin-top:6px"></div>
+              <div class="lib-status" id="poly-model-credit" style="opacity:.7"></div>
+              <div class="model-dz" id="model-dz" style="margin-top:10px">
+                <input type="file" id="model-input" accept=".obj,.glb,.gltf">
+                <span class="drop-icon" style="color:var(--accent3)">[◈]</span>
+                <div class="drop-text">or drop your own <strong style="color:var(--accent3)">.obj .glb .gltf</strong></div>
+              </div>
+              <div class="model-info" id="model-info"></div>
+              <div id="model-ctrl">
+                <div class="toggle-row" style="margin-top:10px"><span class="ctrl-label">Show Model</span><label class="toggle"><input type="checkbox" id="show-model" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
+                <div class="toggle-row"><span class="ctrl-label">Wireframe</span><label class="toggle"><input type="checkbox" id="model-wire"><div class="ttrack"></div></label></div>
+                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Distortion</span><span class="ctrl-val" id="val-distort" style="color:var(--accent3)">0.50</span></div><input type="range" id="distort-amt" min="0" max="3" value="0.5" step="0.05"></div>
+                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Model Scale</span><span class="ctrl-val" id="val-mscale" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-size" min="0.2" max="5" value="1.0" step="0.1"></div>
+                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Opacity</span><span class="ctrl-val" id="val-mopacity" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-opacity" min="0.05" max="1" value="1.0" step="0.05"></div>
+                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Emissive Boost</span><span class="ctrl-val" id="val-emissive" style="color:var(--accent3)">0.5</span></div><input type="range" id="emissive-amt" min="0" max="2" value="0.5" step="0.05"></div>
+                <button id="remove-model-btn" class="px-btn" style="width:100%;margin-top:4px;border-color:var(--accent2);color:var(--accent2)">✕ Remove Model</button>
+                <!-- Model's own camera/render controls — same set as the Voxel
+                     Grid tab, but wired to the model independently so you're
+                     not stuck bouncing to another tab to adjust rotation,
+                     glow, floor, or background while looking at a model. -->
+                <div style="margin:14px 0 8px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;letter-spacing:1px;color:var(--muted)">CAMERA / RENDER</div>
+                <div class="toggle-row"><span class="ctrl-label">Auto-Rotate</span><label class="toggle"><input type="checkbox" id="model-auto-rot" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
+                <div class="toggle-row"><span class="ctrl-label">Beat Pulse</span><label class="toggle"><input type="checkbox" id="model-beat-pulse" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
+                <div class="toggle-row"><span class="ctrl-label">Glow Effect</span><label class="toggle"><input type="checkbox" id="model-use-glow" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
+                <div class="control"><div class="ctrl-row"><span class="ctrl-label">Glow Level</span><span class="ctrl-val" id="val-model-glow" style="color:var(--accent3)">0.28</span></div><input type="range" id="model-glow-level" min="0.02" max="0.8" value="0.28" step="0.02"></div>
+                <div class="toggle-row"><span class="ctrl-label">Show Floor</span><label class="toggle"><input type="checkbox" id="model-show-floor" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
+                <div class="toggle-row"><span class="ctrl-label">Rainbow BG</span><label class="toggle"><input type="checkbox" id="model-rainbow-bg"><div class="ttrack" style="background:var(--accent3)"></div></label></div>
+                <div class="control" style="margin-top:8px"><div class="ctrl-row"><span class="ctrl-label">Rotation Speed</span><span class="ctrl-val" id="val-model-rotspd" style="color:var(--accent3)">0.3</span></div><input type="range" id="model-rot-spd" min="0" max="2" value="0.3" step="0.05"></div>
+                <div class="color-row"><span class="ctrl-label">Background</span><input type="color" id="model-col-bg" value="#0d0f0b"></div>
+              </div>
             </div>
           </div>
           <!-- PRESETS — Device (local browser) and Public (account-based, tied to an album/playlist) -->
@@ -1875,6 +1888,7 @@ function renderFrame(ts){
 //  THREE.JS 3D MODEL VISUALIZER
 // ═══════════════════════════════════════════════════════════
 let threeR=null,threeS=null,threeC=null,modelRoot=null,modelMeshes=[];
+let modelRotY=0,lastThreeT=0; // model's own auto-rotate angle and frame clock, kept separate from the voxel view's rotY/dt
 
 function initThree(){
   if(threeR)return;
@@ -1891,6 +1905,15 @@ function initThree(){
   threeS.userData.kl1=mkLight(0xaaff44,2.5,3,5,4);
   threeS.userData.kl2=mkLight(0xff4466,1.8,-3,-2,-3);
   threeS.userData.kl3=mkLight(0x44aaff,1.2,0,-4,2);
+  // Model's own floor — a simple grid beneath the model, shown/hidden by
+  // the model tab's "Show Floor" toggle, independent of the voxel canvas's
+  // floor (which is drawn in 2D and only applies to the voxel view).
+  const modelFloor=new THREE.GridHelper(6,12,0xaaff44,0x224411);
+  modelFloor.position.y=-1.3;
+  modelFloor.visible=false;
+  threeS.add(modelFloor);
+  threeS.userData.modelFloor=modelFloor;
+  threeS.userData.bgColor=new THREE.Color();
   window.addEventListener('resize',()=>{
     const w=wrap.clientWidth,h=wrap.clientHeight;
     threeC.aspect=w/h;threeC.updateProjectionMatrix();threeR.setSize(w,h);
@@ -1917,25 +1940,55 @@ function updateThreeCamera(){
   threeC.position.set(tx + x, ty + y, z);
   threeC.lookAt(tx, ty, 0);
 }
-function threeLoop(){
+function threeLoop(ts){
   requestAnimationFrame(threeLoop);
   if(!threeR)return;
+  const dt=Math.min(.1,(ts-lastThreeT)/1000)||0; lastThreeT=ts;
   updateThreeCamera();
-  if(!modelRoot||!document.getElementById('show-model').checked){threeR.render(threeS,threeC);return;}
+  const modelActive=modelRoot&&document.getElementById('show-model').checked;
+  const floorGrid=threeS.userData.modelFloor;
+  if(!modelActive){
+    if(floorGrid)floorGrid.visible=false;
+    threeS.background=null; // fully transparent — reveals the voxel canvas underneath, same as before
+    threeR.render(threeS,threeC);
+    return;
+  }
   const bs=hasAudio()?band(0,.15):0,md=hasAudio()?band(.15,.5):0,tr=hasAudio()?band(.5,1):0;
-  // The model itself no longer self-rotates — updateThreeCamera() above is
-  // the only thing that changes the viewing angle now (driven by drag, or
-  // by the existing Auto-Rotate + rotation-speed controls, which orbit the
-  // camera around the model instead of spinning the model in place).
-  const pulse=1+beatFlash*.18,mscale=+document.getElementById('model-size').value;
+
+  // Model's own Auto-Rotate/Rotation Speed — spins the model in place,
+  // separate from the camera-orbit rotY the voxel canvas's drag/Auto-Rotate
+  // controls drive, so the two don't fight over the same angle.
+  if(document.getElementById('model-auto-rot').checked){
+    modelRotY += dt*+document.getElementById('model-rot-spd').value;
+  }
+  modelRoot.rotation.y=modelRotY;
+
+  // Model's own Show Floor / Rainbow BG / Background.
+  if(floorGrid)floorGrid.visible=document.getElementById('model-show-floor').checked;
+  const bgColor=threeS.userData.bgColor;
+  if(document.getElementById('model-rainbow-bg').checked){
+    bgColor.setHSL(((frame*.5)%360)/360,.6,.14);
+  }else{
+    bgColor.set(document.getElementById('model-col-bg').value);
+  }
+  threeS.background=bgColor;
+
+  const beatPulseOn=document.getElementById('model-beat-pulse').checked;
+  const pulse=1+(beatPulseOn?beatFlash*.18:0),mscale=+document.getElementById('model-size').value;
   modelRoot.scale.setScalar(mscale*pulse);
 
-  const kl1=threeS.userData.kl1,kl2=threeS.userData.kl2,kl3=threeS.userData.kl3;
-  if(kl1){kl1.intensity=1.8+bs*4+beatFlash*2.5;kl1.position.x=Math.cos(frame*.012)*4;kl1.position.z=Math.sin(frame*.012)*4;}
-  if(kl2){kl2.intensity=1.2+md*2.5+beatFlash*1.2;kl2.position.x=Math.cos(frame*.012+Math.PI)*4;kl2.position.z=Math.sin(frame*.012+Math.PI)*4;}
-  if(kl3)kl3.intensity=0.8+tr*2;
+  // Model's own Glow Effect/Level — boosts key-light intensity and mesh
+  // emissive on top of the base Emissive Boost slider.
+  const glowOn=document.getElementById('model-use-glow').checked;
+  const glowLevel=+document.getElementById('model-glow-level').value;
+  const glowBoost=glowOn?glowLevel*3:0;
 
-  const em=+document.getElementById('emissive-amt').value;
+  const kl1=threeS.userData.kl1,kl2=threeS.userData.kl2,kl3=threeS.userData.kl3;
+  if(kl1){kl1.intensity=1.8+bs*4+beatFlash*2.5+glowBoost;kl1.position.x=Math.cos(frame*.012)*4;kl1.position.z=Math.sin(frame*.012)*4;}
+  if(kl2){kl2.intensity=1.2+md*2.5+beatFlash*1.2+glowBoost*.7;kl2.position.x=Math.cos(frame*.012+Math.PI)*4;kl2.position.z=Math.sin(frame*.012+Math.PI)*4;}
+  if(kl3)kl3.intensity=0.8+tr*2+glowBoost*.5;
+
+  const em=+document.getElementById('emissive-amt').value+(glowOn?glowLevel:0);
   modelMeshes.forEach(mesh=>{
     if(!mesh.material)return;
     const beat=Math.min(1,bs+beatFlash*.4);
@@ -2233,6 +2286,8 @@ document.getElementById('sens').addEventListener('input',e=>{document.getElement
 document.getElementById('smooth').addEventListener('input',e=>{document.getElementById('val-smooth').textContent=(+e.target.value).toFixed(2);});
 document.getElementById('rot-spd').addEventListener('input',e=>{document.getElementById('val-rotspd').textContent=(+e.target.value).toFixed(1);});
 document.getElementById('glow-level').addEventListener('input',e=>{document.getElementById('val-glow').textContent=(+e.target.value).toFixed(2);});
+document.getElementById('model-rot-spd').addEventListener('input',e=>{document.getElementById('val-model-rotspd').textContent=(+e.target.value).toFixed(1);});
+document.getElementById('model-glow-level').addEventListener('input',e=>{document.getElementById('val-model-glow').textContent=(+e.target.value).toFixed(2);});
 document.querySelectorAll('[data-viz]').forEach(b=>b.addEventListener('click',()=>{vizMode=b.dataset.viz;document.querySelectorAll('[data-viz]').forEach(x=>x.classList.remove('active'));b.classList.add('active');}));
 
 // ---- Sub-tabs (Viz Mode/Colors/Voxel Grid/Render, and Device/Public Presets) ----
@@ -2276,7 +2331,11 @@ function collectVizSettings(){
     showModel: document.getElementById('show-model').checked, modelWire: document.getElementById('model-wire').checked,
     showVoxels: document.getElementById('show-voxels').checked,
     distortAmt: document.getElementById('distort-amt').value, modelSize: document.getElementById('model-size').value,
-    modelOpacity: document.getElementById('model-opacity').value, emissiveAmt: document.getElementById('emissive-amt').value
+    modelOpacity: document.getElementById('model-opacity').value, emissiveAmt: document.getElementById('emissive-amt').value,
+    modelAutoRot: document.getElementById('model-auto-rot').checked, modelBeatPulse: document.getElementById('model-beat-pulse').checked,
+    modelUseGlow: document.getElementById('model-use-glow').checked, modelGlowLevel: document.getElementById('model-glow-level').value,
+    modelShowFloor: document.getElementById('model-show-floor').checked, modelRainbowBg: document.getElementById('model-rainbow-bg').checked,
+    modelRotSpd: document.getElementById('model-rot-spd').value, modelColBg: document.getElementById('model-col-bg').value
   };
 }
 function applyVizSettings(s){
@@ -2293,14 +2352,19 @@ function applyVizSettings(s){
   setRange('model-size',s.modelSize,'val-mscale',v=>v.toFixed(1));
   setRange('model-opacity',s.modelOpacity,'val-mopacity',v=>v.toFixed(1));
   setRange('emissive-amt',s.emissiveAmt,'val-emissive',v=>v.toFixed(1));
+  setRange('model-rot-spd',s.modelRotSpd,'val-model-rotspd',v=>v.toFixed(1));
+  setRange('model-glow-level',s.modelGlowLevel,'val-model-glow',v=>v.toFixed(2));
   setCheck('auto-rot',s.autoRot); setCheck('beat-pulse',s.beatPulse); setCheck('use-glow',s.useGlow);
   setCheck('show-floor',s.showFloor); setCheck('rainbow-bg',s.rainbowBg);
   setCheck('show-model',s.showModel); setCheck('model-wire',s.modelWire);
   setCheck('show-voxels',s.showVoxels);
+  setCheck('model-auto-rot',s.modelAutoRot); setCheck('model-beat-pulse',s.modelBeatPulse); setCheck('model-use-glow',s.modelUseGlow);
+  setCheck('model-show-floor',s.modelShowFloor); setCheck('model-rainbow-bg',s.modelRainbowBg);
   toggleVoxelVis();
   if(s.colLo){ document.getElementById('col-lo').value=s.colLo; }
   if(s.colHi){ document.getElementById('col-hi').value=s.colHi; }
   if(s.colBg){ document.getElementById('col-bg').value=s.colBg; }
+  if(s.modelColBg){ document.getElementById('model-col-bg').value=s.modelColBg; }
   if(s.vizMode){
     vizMode=s.vizMode;
     document.querySelectorAll('[data-viz]').forEach(b=>b.classList.toggle('active', b.dataset.viz===vizMode));
