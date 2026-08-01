@@ -1875,7 +1875,6 @@ function renderFrame(ts){
 //  THREE.JS 3D MODEL VISUALIZER
 // ═══════════════════════════════════════════════════════════
 let threeR=null,threeS=null,threeC=null,modelRoot=null,modelMeshes=[];
-let mRotY=0;
 
 function initThree(){
   if(threeR)return;
@@ -1924,10 +1923,10 @@ function threeLoop(){
   updateThreeCamera();
   if(!modelRoot||!document.getElementById('show-model').checked){threeR.render(threeS,threeC);return;}
   const bs=hasAudio()?band(0,.15):0,md=hasAudio()?band(.15,.5):0,tr=hasAudio()?band(.5,1):0;
-  const rotSpd=+document.getElementById('rot-spd').value;
-  mRotY+=(0.005+bs*.012+md*.006)*(rotSpd*.5+.5);
-  modelRoot.rotation.y=mRotY;
-  modelRoot.rotation.x=Math.sin(frame*.008)*.15+bs*.22;
+  // The model itself no longer self-rotates — updateThreeCamera() above is
+  // the only thing that changes the viewing angle now (driven by drag, or
+  // by the existing Auto-Rotate + rotation-speed controls, which orbit the
+  // camera around the model instead of spinning the model in place).
   const pulse=1+beatFlash*.18,mscale=+document.getElementById('model-size').value;
   modelRoot.scale.setScalar(mscale*pulse);
 
