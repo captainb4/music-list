@@ -2213,8 +2213,14 @@ document.querySelectorAll('.subtab-btn').forEach(btn=>{
 });
 
 // ---- Show/hide the voxel grid independently of the 3D model ----
+// Uses opacity, not display:none — the voxel canvas is also the input
+// surface for drag-to-rotate/scroll-to-zoom/right-drag-to-pan (the 3D
+// model's camera reads that same state in updateThreeCamera()). An element
+// with display:none stops receiving mouse events entirely, which silently
+// broke camera control whenever voxels were hidden to look at just a model.
 function toggleVoxelVis(){
-  document.getElementById('canvas').style.display = document.getElementById('show-voxels').checked ? 'block' : 'none';
+  const show = document.getElementById('show-voxels').checked;
+  document.getElementById('canvas').style.opacity = show ? '1' : '0';
 }
 document.getElementById('show-voxels').addEventListener('change',toggleVoxelVis);
 
