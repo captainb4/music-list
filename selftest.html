@@ -48,12 +48,19 @@
 
   <h2>Live Session Test</h2>
   <p>
-    This one actually signs nothing in for you, but checks whether you're signed in, runs a
-    real "Fleetwood Mac Rumours" album search against your live backend, tries clicking ADD
-    on a real result, and — if you have a connection — loads two known-good public test
-    videos into the YouTube engine and exercises Next / Prev / Shuffle / Loop against genuine
-    playback state (checking the actual video ID / index / player time, not just "did it
-    throw"). This is the test that can actually tell you *why* Add Album isn't working.
+    This one auto-signs-in to a test account (username <code>test</code>, password
+    <code>123456</code> — creating that account first if it doesn't exist yet), runs a real
+    "Fleetwood Mac Rumours" album search against your live backend, tries clicking ADD on a
+    real result, and — if you have a connection — loads two known-good public test videos into
+    the YouTube engine and exercises Next / Prev / Shuffle / Loop against genuine playback state
+    (checking the actual video ID / index / player time, not just "did it throw").
+  </p>
+  <p class="note">
+    Heads up: this creates a real, permanent account in your live Supabase database with those
+    exact credentials (they'll be sitting there afterward — anyone who knows to try
+    test/123456 could sign into it). Fine for a throwaway test account, just don't reuse that
+    username/password anywhere that matters, and consider deleting the account later if you
+    care about tidiness.
   </p>
   <div id="controls2">
     <button class="run" id="run2">▶ Run Live Session Test</button>
@@ -161,6 +168,45 @@ async function runLiveTest(){
   `;
   doc.body.appendChild(hook);
   const getState = ()=>{ try{ return win.__test ? win.__test() : {}; }catch(e){ return {}; } };
+
+  // ---- Part 0: Auto sign-in (test / 123456) ----
+  section2('--- Signing in as "test" ---');
+  const TEST_USER = 'test', TEST_PASS = '123456';
+  const acctNav = doc.querySelector('.rail-item[data-page="account"]');
+  if(acctNav) acctNav.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
+  await wait(300);
+  const userField = doc.getElementById('account-username');
+  const passField = doc.getElementById('account-password');
+  const loginBtn = doc.getElementById('account-login-btn');
+  const signupBtn = doc.getElementById('account-signup-btn');
+  const acctStatusEl = doc.getElementById('account-status');
+
+  async function tryLogin(){
+    userField.value = TEST_USER; userField.dispatchEvent(new win.Event('input', {bubbles:true}));
+    passField.value = TEST_PASS; passField.dispatchEvent(new win.Event('input', {bubbles:true}));
+    loginBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
+    await pollUntil(()=> getState().libCurrentUser ? true : (acctStatusEl.textContent && acctStatusEl.textContent !== 'logging in...' ? true : null), 8000);
+    return !!getState().libCurrentUser;
+  }
+
+  if(userField && passField && loginBtn && signupBtn){
+    let ok = await tryLogin();
+    if(!ok){
+      log2('Not logged in yet ("' + (acctStatusEl.textContent||'') + '") — account probably doesn\'t exist. Trying to sign up "test" / "123456"…');
+      signupBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
+      await pollUntil(()=> (acctStatusEl.textContent && acctStatusEl.textContent !== 'creating account...') ? true : null, 8000);
+      log2('Sign-up result: "' + (acctStatusEl.textContent||'(empty — likely signed in immediately)') + '"');
+      if(!getState().libCurrentUser){
+        ok = await tryLogin(); // some Supabase setups require a separate login after signup
+      } else {
+        ok = true;
+      }
+    }
+    const s0 = getState();
+    log2(ok ? ('✓ Signed in as ' + (s0.libCurrentUser && (s0.libCurrentUser.email || s0.libCurrentUser.id))) : ('✗ Could not sign in as "test" — last status: "' + (acctStatusEl.textContent||'') + '"'), ok ? 'pass' : 'fail');
+  } else {
+    log2('Could not find the account username/password fields or buttons.', 'fail');
+  }
 
   // ---- Part 1: Add Album diagnosis ----
   section2('--- Add Album diagnosis ---');
