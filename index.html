@@ -345,6 +345,7 @@ header{flex:0 0 auto}
             </div>
           </div>
           <div class="lib-status" id="pl-import-status" style="margin-top:0">looks up which album each song in the playlist is from, so you can pick which ones to add.</div>
+          <div class="yt-note" style="border-top:none;padding-top:0;margin-top:4px">Note: you have to <strong>ADD</strong> the album(s) below before saving the playlist — only songs from albums already in your library get linked in.</div>
           <div id="pl-import-progress-wrap" style="display:none;margin-top:8px">
             <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
               <span class="lib-label" style="margin-bottom:0">SEARCHING PLAYLIST</span>
@@ -353,6 +354,15 @@ header{flex:0 0 auto}
             <div class="progress-wrap" style="cursor:default"><div class="progress-fill" id="pl-import-progress-fill"></div></div>
           </div>
           <div id="pl-import-results"></div>
+          <div id="pl-save-area" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            <div class="lib-status" style="margin-top:0">save this as one of your playlists, in the original order.</div>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+              <input type="text" id="pl-save-name" class="lib-input" placeholder="name this playlist..." style="flex:1">
+              <label class="toggle" title="make public"><input type="checkbox" id="pl-save-public"><div class="ttrack"></div></label>
+              <button class="lib-btn" id="pl-save-btn" style="width:auto;padding:7px 10px;margin-top:0">SAVE PLAYLIST</button>
+            </div>
+            <div class="lib-status" id="pl-save-status"></div>
+          </div>
         </div>
       </section>
 
@@ -1580,6 +1590,7 @@ async function lookupRecordingAlbum(artist, track){
   }catch(e){ return null; }
 }
 let plImportBusy = false;
+let plImportTracks = []; // last-fetched playlist's tracks: [{videoId,title,position,duration_ms}], used by Save Playlist below
 async function doPlaylistAlbumImport(){
   if(plImportBusy) return;
   const raw = document.getElementById('pl-import-input').value.trim();
@@ -1592,6 +1603,9 @@ async function doPlaylistAlbumImport(){
   if(!YT_SEARCH_CONFIGURED){ statusEl.textContent = 'YouTube search backend not connected — see README.md.'; return; }
   plImportBusy = true;
   resultsEl.innerHTML = '';
+  plImportTracks = [];
+  document.getElementById('pl-save-area').style.display = 'none';
+  document.getElementById('pl-save-status').textContent = '';
   if(btn) btn.disabled = true;
   const progWrap = document.getElementById('pl-import-progress-wrap');
   const progFill = document.getElementById('pl-import-progress-fill');
@@ -1603,6 +1617,7 @@ async function doPlaylistAlbumImport(){
     statusEl.textContent = 'loading playlist...';
     const tracks = await fetchYouTubePlaylistTracks(pid);
     if(!tracks.length){ statusEl.textContent = 'could not load that playlist — check the link and try again.'; return; }
+    plImportTracks = tracks;
     const albumsMap = new Map(); // "artist||title" (lowercase) -> {artist,title,count}
     for(let i=0; i<tracks.length; i++){
       statusEl.textContent = `looking up albums… (${i+1}/${tracks.length})`;
@@ -1617,6 +1632,7 @@ async function doPlaylistAlbumImport(){
       if(i < tracks.length - 1) await sleep(1100); // stay under MusicBrainz's ~1 request/sec limit
     }
     const albums = Array.from(albumsMap.values()).sort((a, b) => b.count - a.count);
+    document.getElementById('pl-save-area').style.display = 'block';
     if(!albums.length){ statusEl.textContent = `matched 0 albums from ${tracks.length} tracks — try Add Album search instead.`; return; }
     statusEl.textContent = `found ${albums.length} album(s) across ${tracks.length} tracks — pick which to add:`;
     resultsEl.innerHTML = albums.map((a, i) => `
@@ -1658,6 +1674,65 @@ async function importAlbumByName(artist, title, btnEl){
     if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'ADD'; }
   }
 }
+
+// ---- save the read-in YouTube playlist as one of the user's own playlists ----
+// Strips the same "(Official Video)"-style junk guessArtistTrack() does,
+// then folds down to bare alphanumerics, so "Money (Official Audio)" lines
+// up with a library track titled just "Money".
+function normalizeTrackTitle(s){
+  return guessArtistTrack(s).track.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+// Looks for a track already in the library (i.e. from an album the user
+// has added, either previously or via the ADD buttons above) whose title
+// matches a YouTube playlist entry — only these can be linked into a saved
+// playlist, since playlist rows point at real library tracks.
+function findLibTrackForTitle(rawTitle){
+  const norm = normalizeTrackTitle(rawTitle);
+  if(!norm) return null;
+  for(const album of libAlbums){
+    for(const t of (album.tracks || [])){
+      const tn = normalizeTrackTitle(t.title);
+      if(tn && (tn === norm || tn.includes(norm) || norm.includes(tn))) return t;
+    }
+  }
+  return null;
+}
+async function savePlaylistFromImport(){
+  const nameEl = document.getElementById('pl-save-name');
+  const statusEl = document.getElementById('pl-save-status');
+  const btn = document.getElementById('pl-save-btn');
+  const name = nameEl.value.trim();
+  if(!libCurrentUser){ statusEl.textContent = 'sign in first (Account tab) to save playlists.'; return; }
+  if(!name){ statusEl.textContent = 'name the playlist first.'; return; }
+  if(!plImportTracks.length){ statusEl.textContent = 'search a playlist above first.'; return; }
+  const isPublic = document.getElementById('pl-save-public').checked;
+  if(btn){ btn.disabled = true; btn.textContent = '...'; }
+  statusEl.textContent = 'saving playlist...';
+  try{
+    const pl = await createLibPlaylist(name, isPublic);
+    if(!pl){ statusEl.textContent = 'could not create playlist — check console.'; return; }
+    const rows = [];
+    let pos = 0;
+    for(const t of plImportTracks){
+      const match = findLibTrackForTitle(t.title);
+      if(match) rows.push({ playlist_id: pl.id, track_id: match.id, position: pos++ });
+    }
+    if(rows.length){
+      const { error } = await sb.from('playlist_tracks').insert(rows);
+      if(error){ console.error(error); statusEl.textContent = `playlist "${name}" created, but adding tracks failed — check console.`; return; }
+    }
+    await loadLibPlaylists();
+    statusEl.textContent = `saved "${name}" to Playlists — ${rows.length}/${plImportTracks.length} song(s) linked (only ones from albums already in your library).`;
+    nameEl.value = '';
+  }catch(e){
+    console.error(e);
+    statusEl.textContent = 'could not save playlist — check console.';
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = 'SAVE PLAYLIST'; }
+  }
+}
+document.getElementById('pl-save-btn').addEventListener('click', savePlaylistFromImport);
+document.getElementById('pl-save-name').addEventListener('keydown', e => { if(e.key === 'Enter') savePlaylistFromImport(); });
 
 async function deleteLibAlbum(albumId){
   if(!confirm('Delete this album and all its tracks? This removes it for everyone.')) return;
@@ -2239,6 +2314,7 @@ function onModelLoaded(obj,fname){
   document.getElementById('model-hud').style.display='block';
   document.getElementById('model-hud-name').textContent=fname;
   updateWire();
+  if(document.getElementById('show-model').checked)hideVoxelsForModel();
 }
 
 function loadModel(file){
@@ -2437,6 +2513,7 @@ function updateOpacity(v){document.getElementById('val-mopacity').textContent=(+
 function toggleModelVis(){
   const show=document.getElementById('show-model').checked;
   document.getElementById('three-canvas').style.display=(show&&modelRoot)?'block':'none';
+  if(show)hideVoxelsForModel();
 }
 
 const mdz=document.getElementById('model-dz');
@@ -2499,6 +2576,13 @@ function toggleVoxelVis(){
   document.getElementById('canvas').style.opacity = show ? '1' : '0';
 }
 document.getElementById('show-voxels').addEventListener('change',toggleVoxelVis);
+// Turning the 3D model on hides the voxel grid, so the two don't overlap —
+// unchecks Show Voxel Grid (Voxel Grid tab) and hides the voxel canvas the
+// same way that toggle itself would.
+function hideVoxelsForModel(){
+  const sv=document.getElementById('show-voxels');
+  if(sv.checked){ sv.checked=false; toggleVoxelVis(); }
+}
 
 // ═══════════════════════════════════════════════════════════
 //  VISUALIZER PRESETS (saved locally in this browser)
@@ -2773,7 +2857,7 @@ document.getElementById('cloud-preset-save-btn').addEventListener('click', async
     poly_model: currentPolyModel || null
   };
   const { error } = await sb.from('presets').insert(row);
-  if(error){ console.error(error); statusEl.textContent='could not publish — check console.'; return; }
+  if(error){ console.error(error); statusEl.textContent = 'could not publish — ' + (error.message || 'check console.'); return; }
   statusEl.textContent=`published "${name}".`; nameEl.value='';
   loadContextPresets();
 });
