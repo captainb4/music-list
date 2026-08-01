@@ -125,14 +125,50 @@ async function runLiveTest(){
   win.addEventListener('error', e=>errors.push('error: ' + e.message));
   win.addEventListener('unhandledrejection', e=>errors.push('promise: ' + String(e.reason && e.reason.message || e.reason)));
   const origErr = win.console.error.bind(win.console);
-  win.console.error = (...a)=>{ errors.push('console.error: ' + a.map(x=>{try{return typeof x==='string'?x:JSON.stringify(x);}catch(_){return String(x);}}).join(' ')); origErr(...a); };
+  win.console.error = (...a)=>{
+    errors.push('console.error: ' + a.map(x=>{
+      if(x && typeof x==='object' && 'message' in x){ // Error-like (instanceof Error won't match across realms)
+        return (x.name||'Error') + ': ' + x.message + (x.stack ? ' | ' + String(x.stack).split('\n')[0] : '');
+      }
+      try{ return typeof x==='string'?x:JSON.stringify(x); }catch(_){ return String(x); }
+    }).join(' '));
+    origErr(...a);
+  };
+
+  // The app's real state (CONFIGURED, libCurrentUser, ytPlayer, etc.) is declared with
+  // let/const at the top of the page's script, which — unlike var — never becomes a
+  // window property. Reading win.libCurrentUser from out here is always undefined
+  // regardless of the real value. Instead, inject a script INTO the iframe's own
+  // document; since it runs in that same top-level script scope, it can see those
+  // bindings by name, and we expose them via a function attached to window (which,
+  // being an explicit assignment, IS visible to us from outside).
+  const hook = doc.createElement('script');
+  hook.textContent = `
+    window.__test = function(){
+      function safe(name){ try{ return eval(name); }catch(e){ return undefined; } }
+      return {
+        CONFIGURED: safe('CONFIGURED'),
+        YT_SEARCH_CONFIGURED: safe('YT_SEARCH_CONFIGURED'),
+        libCurrentUser: safe('libCurrentUser'),
+        libAlbums: safe('libAlbums'),
+        ytPlayer: safe('ytPlayer'),
+        ytIdx: safe('ytIdx'),
+        shuffle: safe('shuffle'),
+        loop: safe('loop'),
+        tracks: safe('tracks')
+      };
+    };
+  `;
+  doc.body.appendChild(hook);
+  const getState = ()=>{ try{ return win.__test ? win.__test() : {}; }catch(e){ return {}; } };
 
   // ---- Part 1: Add Album diagnosis ----
   section2('--- Add Album diagnosis ---');
-  log2('Supabase configured (CONFIGURED): ' + win.CONFIGURED, win.CONFIGURED ? 'pass' : 'fail');
-  log2('YouTube search backend configured (YT_SEARCH_CONFIGURED): ' + win.YT_SEARCH_CONFIGURED, win.YT_SEARCH_CONFIGURED ? 'pass' : 'fail');
-  const signedIn = !!win.libCurrentUser;
-  log2('Currently signed in (libCurrentUser): ' + (signedIn ? (win.libCurrentUser.email || win.libCurrentUser.id) : 'null — NOT signed in'), signedIn ? 'pass' : 'fail');
+  let s = getState();
+  log2('Supabase configured (CONFIGURED): ' + s.CONFIGURED, s.CONFIGURED ? 'pass' : 'fail');
+  log2('YouTube search backend configured (YT_SEARCH_CONFIGURED): ' + s.YT_SEARCH_CONFIGURED, s.YT_SEARCH_CONFIGURED ? 'pass' : 'fail');
+  const signedIn = !!s.libCurrentUser;
+  log2('Currently signed in (libCurrentUser): ' + (signedIn ? (s.libCurrentUser.email || s.libCurrentUser.id) : '(not signed in)'), signedIn ? 'pass' : 'fail');
   if(!signedIn){
     log2('⚠ Not signed in. The ADD button on a search result calls importLibAlbum(), which used to exit with zero feedback when libCurrentUser is null — that was almost certainly why it looked broken. It now shows a "sign in first" message instead, but you still need to actually sign in (Account tab) before ADD will save anything.', 'fail');
   }
@@ -156,10 +192,10 @@ async function runLiveTest(){
     const resultItems = doc.querySelectorAll('.sr-item');
     log2(resultItems.length + ' result card(s) rendered.');
     if(resultItems.length && signedIn){
-      const beforeCount = (win.libAlbums || []).length;
+      const beforeCount = (getState().libAlbums || []).length;
       resultItems[0].querySelector('.sr-add').dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-      const grew = await pollUntil(()=> (win.libAlbums||[]).length > beforeCount ? true : null, 8000);
-      const afterCount = (win.libAlbums || []).length;
+      const grew = await pollUntil(()=> (getState().libAlbums||[]).length > beforeCount ? true : null, 8000);
+      const afterCount = (getState().libAlbums || []).length;
       log2((grew ? '✓' : '✗') + ' Clicked ADD on a real result: libAlbums went from ' + beforeCount + ' to ' + afterCount + '.', grew ? 'pass' : 'fail');
     } else if(resultItems.length && !signedIn){
       log2('Skipping the actual ADD click since you\'re not signed in (would just show the "sign in first" message now).', 'info');
@@ -190,49 +226,53 @@ async function runLiveTest(){
     }
     log2('Queued ' + testVideos.length + ' test videos. Waiting for playback to start…');
     const started = await pollUntil(()=>{
-      try{ return (win.ytPlayer && typeof win.ytPlayer.getPlayerState === 'function' && win.ytPlayer.getPlayerState() === 1) ? true : null; }
+      try{ const st = getState(); return (st.ytPlayer && typeof st.ytPlayer.getPlayerState === 'function' && st.ytPlayer.getPlayerState() === 1) ? true : null; }
       catch(e){ return null; }
     }, 10000);
     if(!started){
-      log2('✗ Playback never reached "playing" state within 10s.', 'fail');
+      log2('✗ Playback never reached "playing" state within 10s. (Could be a real embeddability/network issue, or the queue never got past 0 items — check the "Queued 2 test videos" line above and the errors section below.)', 'fail');
     } else {
       log2('✓ Playback started.', 'pass');
 
-      const idxBefore = win.ytIdx, vidBefore = win.ytPlayer.getVideoData().video_id;
+      let st = getState();
+      const idxBefore = st.ytIdx, vidBefore = st.ytPlayer.getVideoData().video_id;
       doc.getElementById('btn-next').dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
       await wait(1500);
-      const idxAfter = win.ytIdx, vidAfter = (()=>{ try{ return win.ytPlayer.getVideoData().video_id; }catch(e){ return null; } })();
+      st = getState();
+      const idxAfter = st.ytIdx, vidAfter = (()=>{ try{ return st.ytPlayer.getVideoData().video_id; }catch(e){ return null; } })();
       const nextOk = idxAfter !== idxBefore && vidAfter !== vidBefore;
       log2((nextOk?'✓':'✗') + ' Next: index ' + idxBefore + '→' + idxAfter + ', video ' + vidBefore + '→' + vidAfter, nextOk ? 'pass' : 'fail');
 
       doc.getElementById('btn-prev').dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
       await wait(1500);
-      const idxAfterPrev = win.ytIdx;
+      const idxAfterPrev = getState().ytIdx;
       const prevOk = idxAfterPrev !== idxAfter;
       log2((prevOk?'✓':'✗') + ' Prev: index ' + idxAfter + '→' + idxAfterPrev, prevOk ? 'pass' : 'fail');
 
       const shuffleBtn = doc.getElementById('btn-shuffle');
       shuffleBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
       await wait(200);
-      log2('Shuffle toggled on (win.shuffle = ' + win.shuffle + ').');
+      log2('Shuffle toggled on (shuffle = ' + getState().shuffle + ').');
       doc.getElementById('btn-next').dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
       await wait(1500);
-      log2('✓ Next with shuffle on ran without throwing (index now ' + win.ytIdx + ').', 'pass');
+      log2('✓ Next with shuffle on ran without throwing (index now ' + getState().ytIdx + ').', 'pass');
       shuffleBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true})); // back off
       await wait(150);
 
       const loopBtn = doc.getElementById('btn-loop');
       loopBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
       await wait(200);
-      log2('Loop toggled on (win.loop = ' + win.loop + '). Seeking near the end of the current video…');
+      log2('Loop toggled on (loop = ' + getState().loop + '). Seeking near the end of the current video…');
       try{
-        const dur = win.ytPlayer.getDuration();
-        win.ytPlayer.seekTo(Math.max(0, dur - 2), true);
+        const p = getState().ytPlayer;
+        const dur = p.getDuration();
+        p.seekTo(Math.max(0, dur - 2), true);
       }catch(e){ log2('Could not seek: ' + e.message, 'fail'); }
       const restarted = await pollUntil(()=>{
         try{
-          const t = win.ytPlayer.getCurrentTime(), state = win.ytPlayer.getPlayerState();
-          return (state === 1 && t < 5) ? true : null;
+          const p = getState().ytPlayer;
+          const t = p.getCurrentTime(), ps = p.getPlayerState();
+          return (ps === 1 && t < 5) ? true : null;
         }catch(e){ return null; }
       }, 12000);
       log2((restarted?'✓':'✗') + ' Loop ' + (restarted ? 'restarted the same video from the beginning.' : 'did NOT restart the video within 12s of it ending.'), restarted ? 'pass' : 'fail');
