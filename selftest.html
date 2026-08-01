@@ -2,515 +2,417 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>VoxelBeat — Automated Button/Function Test</title>
+<title>VoxelBeat Self-Test</title>
 <style>
-  body{background:#0a0f0a;color:#9fe89f;font-family:'Courier New',monospace;padding:20px;margin:0;}
-  h2{color:#c8ffc8;margin-top:0;}
-  p{color:#7ac97a;max-width:800px;line-height:1.5;}
-  #controls{margin:16px 0;display:flex;gap:10px;align-items:center;}
-  button.run{background:#163a16;color:#afffaf;border:1px solid #4a4;padding:10px 20px;cursor:pointer;font-family:inherit;font-size:14px;border-radius:4px;}
-  button.run:hover{background:#1e4d1e;}
-  button.run:disabled{opacity:.5;cursor:default;}
-  #summary{font-size:15px;margin-left:8px;}
-  #report{white-space:pre-wrap;background:#0e140e;border:1px solid #2a4a2a;padding:14px;margin-top:12px;max-height:50vh;overflow:auto;font-size:13px;border-radius:4px;}
-  #report div{padding:1px 0;}
-  .fail{color:#ff6b6b;}
-  .pass{color:#5fd75f;opacity:.7;}
-  .info{color:#ffd166;}
-  .section{color:#6bd6ff;margin-top:10px;font-weight:bold;}
-  iframe{width:100%;height:520px;border:1px solid #2a4a2a;background:#000;margin-top:14px;border-radius:4px;}
-  .note{color:#e0a030;font-size:13px;}
+  :root{--bg:#0b0f0d;--panel:#111815;--fg:#d7f5df;--accent:#5cf29a;--accent2:#ff5c7a;--muted:#7fa38c;--mono:'Courier New',monospace}
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--fg);font-family:var(--mono);margin:0;padding:20px;font-size:13px}
+  h1{font-size:16px;letter-spacing:1px;color:var(--accent);margin:0 0 4px}
+  h2{font-size:13px;letter-spacing:1px;color:var(--accent);border-bottom:1px solid #223;padding-bottom:6px;margin-top:28px}
+  p.sub{color:var(--muted);margin:0 0 16px;line-height:1.5}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+  button.run{background:var(--accent);color:#04140b;border:0;padding:9px 16px;font-family:var(--mono);font-weight:bold;letter-spacing:.5px;cursor:pointer;border-radius:3px}
+  button.run:disabled{opacity:.5;cursor:default}
+  button.run.secondary{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+  #frame-wrap{border:1px solid #223;border-radius:4px;overflow:hidden;margin:10px 0;height:0}
+  iframe{width:100%;height:900px;border:0;background:#fff}
+  pre{background:#060a08;border:1px solid #1c2a22;border-radius:4px;padding:12px;white-space:pre-wrap;word-break:break-word;line-height:1.55;max-height:520px;overflow:auto}
+  .ok{color:var(--accent)}
+  .bad{color:var(--accent2)}
+  .warn{color:#e8c34a}
+  .dim{color:var(--muted)}
+  code{color:#9fd8ff}
+  a{color:var(--accent)}
 </style>
 </head>
 <body>
-  <h2>VoxelBeat — Automated Button / Function Test</h2>
-  <p>
-    Loads <code>index.html</code> in the iframe below, then programmatically clicks every
-    button, toggles every checkbox/slider, and cycles every dropdown — while capturing any
-    JS errors, unhandled promise rejections, or <code>console.error</code> calls that result.
-  </p>
-  <p class="note">
-    Note: this only catches things that break immediately or throw an error. It won't catch
-    things that are "wrong but silent" (e.g. a button that runs without error but does the
-    wrong thing), and some controls (audio uploads, YouTube search results, Supabase-backed
-    playlists) need real network/user data to fully exercise — watch the iframe itself while
-    the test runs too. Best run from the actual deployed GitHub Pages URL, not a local file,
-    so the iframe isn't blocked by same-origin restrictions.
-  </p>
-  <div id="controls">
-    <button class="run" id="run">▶ Run Blind Click Test</button>
-    <span id="summary"></span>
-  </div>
-  <div id="report">Click "Run Blind Click Test" to begin…</div>
-  <iframe id="app" src="about:blank"></iframe>
 
-  <hr style="border-color:#2a4a2a;margin:34px 0 24px;">
+<h1>▶ VOXELBEAT SELF-TEST</h1>
+<p class="sub">
+  Standalone diagnostic harness — doesn't modify <code>index.html</code>. Loads your real site in a hidden iframe and
+  exercises it programmatically. Must be served over <code>http(s)://</code> from the <b>same origin</b> as
+  <code>index.html</code> (e.g. your GitHub Pages URL) — opening this file directly as <code>file://</code> will
+  fail for the same cross-origin reason YouTube playback needs real hosting.
+</p>
 
-  <h2>Live Session Test</h2>
-  <p>
-    This one auto-signs-in to a test account (username <code>test</code>, password
-    <code>123456</code> — creating that account first if it doesn't exist yet), runs a real
-    "Fleetwood Mac Rumours" album search against your live backend, tries clicking ADD on a
-    real result, and — if you have a connection — loads two known-good public test videos into
-    the YouTube engine and exercises Next / Prev / Shuffle / Loop against genuine playback state
-    (checking the actual video ID / index / player time, not just "did it throw").
-  </p>
-  <p class="note">
-    Heads up: this creates a real, permanent account in your live Supabase database with those
-    exact credentials (they'll be sitting there afterward — anyone who knows to try
-    test/123456 could sign into it). Fine for a throwaway test account, just don't reuse that
-    username/password anywhere that matters, and consider deleting the account later if you
-    care about tidiness.
-  </p>
-  <div id="controls2">
-    <button class="run" id="run2">▶ Run Live Session Test</button>
-    <span id="summary2"></span>
-  </div>
-  <div id="report2">Click "Run Live Session Test" to begin… (takes ~20-30s)</div>
-  <iframe id="app2" src="about:blank"></iframe>
+<div class="row">
+  <button class="run" id="run-blind">▶ Run Blind Click Test</button>
+  <button class="run secondary" id="run-live">▶ Run Live Session Test</button>
+</div>
+
+<div id="frame-wrap"><iframe id="frame" src="index.html"></iframe></div>
+
+<h2>Blind Click Test</h2>
+<p class="sub">Clicks every button, flips every checkbox, drags every slider to max, and focuses/types every text field — cold, with nothing loaded. Catches wiring bugs (broken <code>getElementById</code>, undefined functions, thrown errors). Won't catch silent wrong-behavior, since most controls early-exit when there's no track/data loaded.</p>
+<pre id="blind-report">— not run yet —</pre>
+
+<h2>Live Session Test</h2>
+<p class="sub">Auto-signs in as a real disposable account (<code>test</code> / <code>123456</code>) on your live Supabase backend, runs a real YouTube album search, adds a real album, then queues two real public YouTube videos and checks actual playback state through Next/Prev/Shuffle/Loop. Also probes the 3D model search backends (Poly Pizza + Icosa Gallery). This creates a permanent account in your database — fine for testing, delete it later if you want.</p>
+<pre id="live-report">— not run yet —</pre>
 
 <script>
-function pollUntil(fn, timeoutMs, intervalMs){
-  intervalMs = intervalMs || 250;
-  return new Promise(resolve=>{
-    const start = Date.now();
-    const tick = ()=>{
-      let val;
-      try{ val = fn(); }catch(e){ val = undefined; }
-      if(val){ resolve(val); return; }
-      if(Date.now() - start > timeoutMs){ resolve(null); return; }
-      setTimeout(tick, intervalMs);
-    };
-    tick();
+const frame = document.getElementById('frame');
+const blindReport = document.getElementById('blind-report');
+const liveReport = document.getElementById('live-report');
+const runBlindBtn = document.getElementById('run-blind');
+const runLiveBtn = document.getElementById('run-live');
+
+function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function line(el, html){ el.innerHTML += (el.innerHTML && el.innerHTML !== '— not run yet —' ? '\n' : (el.innerHTML='') ) + html; }
+function reset(el){ el.innerHTML = ''; }
+
+function waitForLoad(){
+  return new Promise(resolve => {
+    if (frame.contentDocument && frame.contentDocument.readyState === 'complete' && frame.contentWindow.document.body.children.length) {
+      resolve(); return;
+    }
+    frame.addEventListener('load', () => resolve(), { once: true });
   });
 }
 
-const reportEl2 = document.getElementById('report2');
-const summaryEl2 = document.getElementById('summary2');
-const runBtn2 = document.getElementById('run2');
-function log2(msg, cls){
-  const d = document.createElement('div');
-  if(cls) d.className = cls;
-  d.textContent = msg;
-  reportEl2.appendChild(d);
-  reportEl2.scrollTop = reportEl2.scrollHeight;
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function errText(e){
+  if (!e) return String(e);
+  if (e instanceof Error) return e.message + (e.stack ? ' | ' + String(e.stack).split('\n')[0] : '');
+  try { return JSON.stringify(e); } catch(_) { return String(e); }
 }
-function section2(msg){ log2(msg, 'section'); }
 
-async function runLiveTest(){
-  runBtn2.disabled = true;
-  reportEl2.innerHTML = '';
-  summaryEl2.textContent = '';
-  const iframe = document.getElementById('app2');
+// ============================================================
+// BLIND CLICK TEST
+// ============================================================
+async function runBlindTest(){
+  runBlindBtn.disabled = true;
+  reset(blindReport);
+  line(blindReport, 'Reloading index.html…');
 
-  section2('Loading index.html…');
-  try{
-    await new Promise((resolve, reject)=>{
-      const t = setTimeout(()=>reject(new Error('iframe never fired onload after 15s')), 15000);
-      iframe.onload = ()=>{ clearTimeout(t); resolve(); };
-      iframe.src = 'index.html?_livetest=' + Date.now();
-    });
-  }catch(e){
-    log2('FATAL: ' + e.message, 'fail');
-    runBtn2.disabled = false;
-    return;
-  }
-  await wait(1500);
+  frame.src = 'index.html?_t=' + Date.now();
+  await waitForLoad();
+  await sleep(600); // let init/auth/session code settle
 
-  let win, doc;
-  try{
-    win = iframe.contentWindow;
-    doc = iframe.contentDocument;
-    if(!doc) throw new Error('contentDocument is null');
-  }catch(e){
-    log2('FATAL: cannot access iframe contents — ' + e.message, 'fail');
-    runBtn2.disabled = false;
-    return;
-  }
-
+  const win = frame.contentWindow, doc = frame.contentDocument;
+  let passed = 0, flagged = 0, errCount = 0;
   const errors = [];
-  win.addEventListener('error', e=>errors.push('error: ' + e.message));
-  win.addEventListener('unhandledrejection', e=>errors.push('promise: ' + String(e.reason && e.reason.message || e.reason)));
-  const origErr = win.console.error.bind(win.console);
-  win.console.error = (...a)=>{
-    errors.push('console.error: ' + a.map(x=>{
-      if(x && typeof x==='object' && 'message' in x){ // Error-like (instanceof Error won't match across realms)
-        return (x.name||'Error') + ': ' + x.message + (x.stack ? ' | ' + String(x.stack).split('\n')[0] : '');
-      }
-      try{ return typeof x==='string'?x:JSON.stringify(x); }catch(_){ return String(x); }
-    }).join(' '));
-    origErr(...a);
+
+  const origError = win.console.error;
+  win.console.error = function(...args){
+    errCount++;
+    errors.push(args.map(a => a instanceof Error ? (a.message + (a.stack ? ' | ' + String(a.stack).split('\n')[0] : '')) : (typeof a==='object' ? JSON.stringify(a) : String(a))).join(' '));
+    origError.apply(win.console, args);
+  };
+  win.addEventListener('error', ev => { errCount++; errors.push('window.onerror: ' + ev.message); });
+  win.addEventListener('unhandledrejection', ev => { errCount++; errors.push('unhandledrejection: ' + errText(ev.reason)); });
+
+  function label(el){
+    if (el.id) return '#' + el.id;
+    const ds = el.dataset || {};
+    const dsKey = Object.keys(ds)[0];
+    if (dsKey) return '[data-' + dsKey + '="' + ds[dsKey] + '"]';
+    return (el.className || el.tagName).toString().split(' ')[0];
+  }
+
+  line(blindReport, '\n--- Buttons ---');
+  const buttons = Array.from(doc.querySelectorAll('button'));
+  line(blindReport, `Found ${buttons.length} &lt;button&gt; elements.`);
+  for (const b of buttons){
+    const before = errCount;
+    try{ b.click(); }catch(e){ errCount++; errors.push('click threw on ' + label(b) + ': ' + errText(e)); }
+    await sleep(15);
+    if (errCount > before){ flagged++; line(blindReport, `<span class="bad">FLAG</span> [${esc(label(b))}]`); }
+    else { passed++; }
+  }
+  line(blindReport, `<span class="ok">ok</span>    (${buttons.length} buttons clicked)`);
+
+  line(blindReport, '\n--- Checkboxes ---');
+  const checks = Array.from(doc.querySelectorAll('input[type="checkbox"]'));
+  line(blindReport, `Found ${checks.length} checkboxes.`);
+  for (const c of checks){
+    const before = errCount;
+    try{ c.click(); }catch(e){ errCount++; errors.push('checkbox click threw on ' + label(c) + ': ' + errText(e)); }
+    await sleep(10);
+    if (errCount > before){ flagged++; line(blindReport, `<span class="bad">FLAG</span> [checkbox:${esc(c.id)}]`); }
+    else { passed++; line(blindReport, `<span class="ok">ok</span>    [checkbox:${esc(c.id)}]`); }
+  }
+
+  line(blindReport, '\n--- Sliders / number inputs ---');
+  const ranges = Array.from(doc.querySelectorAll('input[type="range"], input[type="number"]'));
+  line(blindReport, `Found ${ranges.length} range/number inputs.`);
+  for (const r of ranges){
+    const before = errCount;
+    try{
+      r.value = r.max || 100;
+      r.dispatchEvent(new Event('input', { bubbles: true }));
+      r.dispatchEvent(new Event('change', { bubbles: true }));
+    }catch(e){ errCount++; errors.push('slider set threw on ' + label(r) + ': ' + errText(e)); }
+    await sleep(10);
+    if (errCount > before){ flagged++; line(blindReport, `<span class="bad">FLAG</span> [input:${esc(r.id)}]`); }
+    else { passed++; line(blindReport, `<span class="ok">ok</span>    [input:${esc(r.id)}]`); }
+  }
+
+  line(blindReport, '\n--- Text inputs (focus/type/blur only) ---');
+  const texts = Array.from(doc.querySelectorAll('input[type="text"], input[type="password"], input[type="search"]'));
+  line(blindReport, `Found ${texts.length} text-like inputs.`);
+  for (const t of texts){
+    const before = errCount;
+    try{
+      t.focus(); t.value = 'test'; t.dispatchEvent(new Event('input', { bubbles: true })); t.blur();
+    }catch(e){ errCount++; errors.push('text input threw on ' + label(t) + ': ' + errText(e)); }
+    await sleep(10);
+    if (errCount > before){ flagged++; line(blindReport, `<span class="bad">FLAG</span> [text:${esc(t.id)}]`); }
+    else { passed++; line(blindReport, `<span class="ok">ok</span>    [text:${esc(t.id)}]`); }
+  }
+
+  line(blindReport, '\n--- Done ---');
+  line(blindReport, `${passed} passed, ${flagged} flagged, ${errCount} total error event(s) captured.`);
+  if (errors.length){
+    line(blindReport, '\n--- Captured error text (first 20) ---');
+    errors.slice(0, 20).forEach(e => line(blindReport, esc(e)));
+  }
+
+  runBlindBtn.disabled = false;
+}
+
+// ============================================================
+// LIVE SESSION TEST
+// ============================================================
+async function runLiveTest(){
+  runLiveBtn.disabled = true;
+  reset(liveReport);
+  line(liveReport, 'Reloading index.html…');
+
+  frame.src = 'index.html?_t=' + Date.now();
+  await waitForLoad();
+  await sleep(700);
+
+  const win = frame.contentWindow, doc = frame.contentDocument;
+  const errorsSeen = [];
+  const origError = win.console.error;
+  win.console.error = function(...args){
+    errorsSeen.push(args.map(a => errText(a)).join(' '));
+    origError.apply(win.console, args);
   };
 
-  // The app's real state (CONFIGURED, libCurrentUser, ytPlayer, etc.) is declared with
-  // let/const at the top of the page's script, which — unlike var — never becomes a
-  // window property. Reading win.libCurrentUser from out here is always undefined
-  // regardless of the real value. Instead, inject a script INTO the iframe's own
-  // document; since it runs in that same top-level script scope, it can see those
-  // bindings by name, and we expose them via a function attached to window (which,
-  // being an explicit assignment, IS visible to us from outside).
+  // Top-level `let`/`const` in index.html never attach to window, so inject a
+  // script INTO the iframe's own document — it shares that top-level scope
+  // and can read the variables by name. Expose them via a function on window.
   const hook = doc.createElement('script');
   hook.textContent = `
-    window.__test = function(){
-      function safe(name){ try{ return eval(name); }catch(e){ return undefined; } }
-      return {
-        CONFIGURED: safe('CONFIGURED'),
-        YT_SEARCH_CONFIGURED: safe('YT_SEARCH_CONFIGURED'),
-        libCurrentUser: safe('libCurrentUser'),
-        libAlbums: safe('libAlbums'),
-        ytPlayer: safe('ytPlayer'),
-        ytIdx: safe('ytIdx'),
-        shuffle: safe('shuffle'),
-        loop: safe('loop'),
-        tracks: safe('tracks')
-      };
+    window.__selftest_state = function(){
+      try{
+        return {
+          CONFIGURED: (typeof CONFIGURED!=='undefined')?CONFIGURED:undefined,
+          YT_SEARCH_CONFIGURED: (typeof YT_SEARCH_CONFIGURED!=='undefined')?YT_SEARCH_CONFIGURED:undefined,
+          libCurrentUser: (typeof libCurrentUser!=='undefined')?libCurrentUser:undefined,
+          libIsAdmin: (typeof libIsAdmin!=='undefined')?libIsAdmin:undefined,
+          libAlbumsCount: (typeof libAlbums!=='undefined')?libAlbums.length:undefined,
+          shuffle: (typeof shuffle!=='undefined')?shuffle:undefined,
+          loop: (typeof loop!=='undefined')?loop:undefined,
+          ytIdx: (typeof ytIdx!=='undefined')?ytIdx:undefined,
+          ytQLen: (typeof ytQ!=='undefined')?ytQ.length:undefined,
+          ytQVid: (typeof ytQ!=='undefined' && ytQ[ytIdx])?ytQ[ytIdx].vid:undefined,
+          ytReady: (typeof ytReady!=='undefined')?ytReady:undefined,
+          ytPlayerState: (typeof ytPlayer!=='undefined' && ytPlayer && ytPlayer.getPlayerState)?(()=>{try{return ytPlayer.getPlayerState();}catch(e){return 'err';}})():undefined
+        };
+      }catch(e){ return { hookError: String(e) }; }
     };
+    window.__selftest_pushYtQueue = function(items){
+      try{
+        if (typeof ytQ === 'undefined') return false;
+        items.forEach(it => ytQ.push(it));
+        if (typeof renderYtQ === 'function') renderYtQ();
+        return true;
+      }catch(e){ return String(e); }
+    };
+    window.__selftest_ytLoad = function(i){ try{ if(typeof ytLoad==='function'){ ytLoad(i); return true; } return false; }catch(e){ return String(e); } };
+    window.__selftest_ytNext = function(){ try{ if(typeof ytNext==='function'){ ytNext(); return true; } return false; }catch(e){ return String(e); } };
+    window.__selftest_ytPrev = function(){ try{ if(typeof ytPrev==='function'){ ytPrev(); return true; } return false; }catch(e){ return String(e); } };
+    window.__selftest_toggleShuffle = function(){ try{ document.getElementById('btn-shuffle').click(); return true; }catch(e){ return String(e); } };
+    window.__selftest_toggleLoop = function(){ try{ document.getElementById('btn-loop').click(); return true; }catch(e){ return String(e); } };
   `;
   doc.body.appendChild(hook);
-  const getState = ()=>{ try{ return win.__test ? win.__test() : {}; }catch(e){ return {}; } };
+  const state = () => { try{ return win.__selftest_state(); }catch(e){ return { hookError: errText(e) }; } };
 
-  // ---- Part 0: Auto sign-in (test / 123456) ----
-  section2('--- Signing in as "test" ---');
-  const TEST_USER = 'test', TEST_PASS = '123456';
-  const acctNav = doc.querySelector('.rail-item[data-page="account"]');
-  if(acctNav) acctNav.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-  await wait(300);
-  const userField = doc.getElementById('account-username');
-  const passField = doc.getElementById('account-password');
-  const loginBtn = doc.getElementById('account-login-btn');
-  const signupBtn = doc.getElementById('account-signup-btn');
-  const acctStatusEl = doc.getElementById('account-status');
+  function goto(page){
+    const btn = doc.querySelector(`.rail-item[data-page="${page}"]`);
+    if (btn) btn.click();
+  }
+  function val(id){ const el = doc.getElementById(id); return el ? el.value : undefined; }
+  function setVal(id, v){ const el = doc.getElementById(id); if(!el) return false; el.value = v; el.dispatchEvent(new Event('input', {bubbles:true})); return true; }
+  function click(id){ const el = doc.getElementById(id); if(!el) return false; el.click(); return true; }
 
-  async function tryLogin(){
-    userField.value = TEST_USER; userField.dispatchEvent(new win.Event('input', {bubbles:true}));
-    passField.value = TEST_PASS; passField.dispatchEvent(new win.Event('input', {bubbles:true}));
-    loginBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-    await pollUntil(()=> getState().libCurrentUser ? true : (acctStatusEl.textContent && acctStatusEl.textContent !== 'logging in...' ? true : null), 8000);
-    return !!getState().libCurrentUser;
+  // ---- Step 0: sign in (or sign up) as test / 123456 ----
+  line(liveReport, '\n--- Signing in as "test" ---');
+  goto('account');
+  await sleep(150);
+  setVal('account-username', 'test');
+  setVal('account-password', '123456');
+  click('account-login-btn');
+  await sleep(1800);
+  let s = state();
+  if (!s.libCurrentUser){
+    line(liveReport, 'login failed or account missing — trying sign up…');
+    click('account-signup-btn');
+    await sleep(2200);
+    s = state();
+    if (!s.libCurrentUser){
+      click('account-login-btn');
+      await sleep(1800);
+      s = state();
+    }
+  }
+  if (s.libCurrentUser){
+    line(liveReport, `<span class="ok">✓</span> Signed in as ${esc(s.libCurrentUser.email || s.libCurrentUser.id)}`);
+  } else {
+    line(liveReport, '<span class="bad">✗</span> Could not sign in. Continuing with remaining checks, but Add Album will report "not signed in."');
   }
 
-  if(userField && passField && loginBtn && signupBtn){
-    let ok = await tryLogin();
-    if(!ok){
-      log2('Not logged in yet ("' + (acctStatusEl.textContent||'') + '") — account probably doesn\'t exist. Trying to sign up "test" / "123456"…');
-      signupBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-      await pollUntil(()=> (acctStatusEl.textContent && acctStatusEl.textContent !== 'creating account...') ? true : null, 8000);
-      log2('Sign-up result: "' + (acctStatusEl.textContent||'(empty — likely signed in immediately)') + '"');
-      if(!getState().libCurrentUser){
-        ok = await tryLogin(); // some Supabase setups require a separate login after signup
+  // ---- Step 1: Add Album diagnosis (real YouTube search backend) ----
+  line(liveReport, '\n--- Add Album diagnosis ---');
+  line(liveReport, `Supabase configured (CONFIGURED): ${s.CONFIGURED}`);
+  line(liveReport, `YouTube search backend configured (YT_SEARCH_CONFIGURED): ${s.YT_SEARCH_CONFIGURED}`);
+  line(liveReport, `Currently signed in (libCurrentUser): ${s.libCurrentUser ? (s.libCurrentUser.email||s.libCurrentUser.id) : 'null — NOT signed in'}`);
+  const albumsBefore = s.libAlbumsCount;
+
+  goto('add');
+  await sleep(150);
+  setVal('album-search-input', 'Fleetwood Mac Rumours');
+  click('album-search-btn');
+  await sleep(4000);
+  const searchStatus = doc.getElementById('album-search-status');
+  const statusText = searchStatus ? searchStatus.textContent : '(no status element found)';
+  line(liveReport, `Search status: "${esc(statusText)}"`);
+  const resultCards = doc.querySelectorAll('#album-search-results .sr-item');
+  line(liveReport, `${resultCards.length} result card(s) rendered.`);
+
+  if (resultCards.length && s.libCurrentUser){
+    const addBtn = resultCards[0].querySelector('.sr-add');
+    if (addBtn){
+      addBtn.click();
+      await sleep(4500);
+      const after = state();
+      if (typeof after.libAlbumsCount === 'number' && typeof albumsBefore === 'number' && after.libAlbumsCount > albumsBefore){
+        line(liveReport, `<span class="ok">✓</span> Clicked ADD on a real result: libAlbums went from ${albumsBefore} to ${after.libAlbumsCount}.`);
       } else {
-        ok = true;
+        line(liveReport, `<span class="warn">⚠</span> Clicked ADD but libAlbums count didn't visibly increase (${albumsBefore} → ${after.libAlbumsCount}). Check the status text above for why.`);
       }
     }
-    const s0 = getState();
-    log2(ok ? ('✓ Signed in as ' + (s0.libCurrentUser && (s0.libCurrentUser.email || s0.libCurrentUser.id))) : ('✗ Could not sign in as "test" — last status: "' + (acctStatusEl.textContent||'') + '"'), ok ? 'pass' : 'fail');
+  } else if (!s.libCurrentUser) {
+    line(liveReport, '<span class="dim">(skipped clicking ADD — not signed in)</span>');
   } else {
-    log2('Could not find the account username/password fields or buttons.', 'fail');
+    line(liveReport, '<span class="dim">(no results to click ADD on)</span>');
   }
 
-  // ---- Part 1: Add Album diagnosis ----
-  section2('--- Add Album diagnosis ---');
-  let s = getState();
-  log2('Supabase configured (CONFIGURED): ' + s.CONFIGURED, s.CONFIGURED ? 'pass' : 'fail');
-  log2('YouTube search backend configured (YT_SEARCH_CONFIGURED): ' + s.YT_SEARCH_CONFIGURED, s.YT_SEARCH_CONFIGURED ? 'pass' : 'fail');
-  const signedIn = !!s.libCurrentUser;
-  log2('Currently signed in (libCurrentUser): ' + (signedIn ? (s.libCurrentUser.email || s.libCurrentUser.id) : '(not signed in)'), signedIn ? 'pass' : 'fail');
-  if(!signedIn){
-    log2('⚠ Not signed in. The ADD button on a search result calls importLibAlbum(), which used to exit with zero feedback when libCurrentUser is null — that was almost certainly why it looked broken. It now shows a "sign in first" message instead, but you still need to actually sign in (Account tab) before ADD will save anything.', 'fail');
-  }
-
-  const addNav = doc.querySelector('.rail-item[data-page="add"]');
-  if(addNav) addNav.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-  await wait(300);
-  const searchInput = doc.getElementById('album-search-input');
-  const searchBtn = doc.getElementById('album-search-btn');
-  if(searchInput && searchBtn){
-    searchInput.value = 'Fleetwood Mac Rumours';
-    searchInput.dispatchEvent(new win.Event('input', {bubbles:true}));
-    searchBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-    const statusEl = doc.getElementById('album-search-status');
-    const finalStatus = await pollUntil(()=>{
-      const t = statusEl && statusEl.textContent;
-      return (t && t !== 'searching YouTube...') ? t : null;
-    }, 8000);
-    const gotResults = !!(finalStatus && /result/.test(finalStatus));
-    log2('Search status: "' + (finalStatus || '(timed out — stuck on "searching...")') + '"', gotResults ? 'pass' : 'fail');
-    const resultItems = doc.querySelectorAll('.sr-item');
-    log2(resultItems.length + ' result card(s) rendered.');
-    if(resultItems.length && signedIn){
-      const beforeCount = (getState().libAlbums || []).length;
-      resultItems[0].querySelector('.sr-add').dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-      const grew = await pollUntil(()=> (getState().libAlbums||[]).length > beforeCount ? true : null, 8000);
-      const afterCount = (getState().libAlbums || []).length;
-      log2((grew ? '✓' : '✗') + ' Clicked ADD on a real result: libAlbums went from ' + beforeCount + ' to ' + afterCount + '.', grew ? 'pass' : 'fail');
-    } else if(resultItems.length && !signedIn){
-      log2('Skipping the actual ADD click since you\'re not signed in (would just show the "sign in first" message now).', 'info');
+  // ---- Step 2: live YouTube playback test (real public videos) ----
+  line(liveReport, '\n--- Live YouTube playback test ---');
+  goto('youtube');
+  await sleep(150);
+  const pushed = win.__selftest_pushYtQueue([
+    { title: 'Self-Test Video A', artist: '', vid: 'aqz-KE-bpKQ' },
+    { title: 'Self-Test Video B', artist: '', vid: 'eRsGyueVLvQ' }
+  ]);
+  if (pushed !== true){
+    line(liveReport, `<span class="bad">✗</span> Could not push test queue into ytQ (${esc(String(pushed))}).`);
+  } else {
+    win.__selftest_ytLoad(0);
+    line(liveReport, 'Queued 2 test videos. Waiting for playback to start…');
+    let playing = false;
+    for (let i = 0; i < 20; i++){
+      await sleep(500);
+      const st = state();
+      if (st.ytPlayerState === 1){ playing = true; break; }
     }
-  } else {
-    log2('Could not find the album search input/button in the DOM.', 'fail');
-  }
+    if (playing){
+      line(liveReport, '<span class="ok">✓</span> Playback started.');
+      const beforeNext = state();
+      win.__selftest_ytNext();
+      await sleep(1500);
+      const afterNext = state();
+      if (afterNext.ytIdx !== beforeNext.ytIdx && afterNext.ytQVid !== beforeNext.ytQVid){
+        line(liveReport, `<span class="ok">✓</span> Next: index ${beforeNext.ytIdx}→${afterNext.ytIdx}, video ${beforeNext.ytQVid}→${afterNext.ytQVid}`);
+      } else {
+        line(liveReport, `<span class="bad">✗</span> Next didn't change index/video (still ${afterNext.ytIdx} / ${afterNext.ytQVid}).`);
+      }
+      win.__selftest_ytPrev();
+      await sleep(1500);
+      const afterPrev = state();
+      if (afterPrev.ytIdx === beforeNext.ytIdx){
+        line(liveReport, `<span class="ok">✓</span> Prev: index ${afterNext.ytIdx}→${afterPrev.ytIdx}`);
+      } else {
+        line(liveReport, `<span class="bad">✗</span> Prev didn't return to the previous index.`);
+      }
 
-  // ---- Part 2: Live YouTube playback + transport controls ----
-  section2('--- Live YouTube playback test ---');
-  const ytNav = doc.querySelector('.rail-item[data-page="youtube"]');
-  if(ytNav) ytNav.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-  await wait(300);
-  const ytInput = doc.getElementById('yt-input');
-  const ytAddBtn = doc.getElementById('yt-add-btn');
-  if(!ytInput || !ytAddBtn){
-    log2('Could not find the YouTube add input/button.', 'fail');
-  } else {
-    const testVideos = [
-      'https://www.youtube.com/watch?v=aqz-KE-bpKQ', // Big Buck Bunny (Blender Foundation, CC-licensed test video)
-      'https://www.youtube.com/watch?v=eRsGyueVLvQ'  // Sintel trailer (Blender Foundation, CC-licensed test video)
-    ];
-    for(const url of testVideos){
-      ytInput.value = url;
-      ytInput.dispatchEvent(new win.Event('input', {bubbles:true}));
-      ytAddBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-      await wait(700);
-    }
-    log2('Queued ' + testVideos.length + ' test videos. Waiting for playback to start…');
-    const started = await pollUntil(()=>{
-      try{ const st = getState(); return (st.ytPlayer && typeof st.ytPlayer.getPlayerState === 'function' && st.ytPlayer.getPlayerState() === 1) ? true : null; }
-      catch(e){ return null; }
-    }, 10000);
-    if(!started){
-      log2('✗ Playback never reached "playing" state within 10s. (Could be a real embeddability/network issue, or the queue never got past 0 items — check the "Queued 2 test videos" line above and the errors section below.)', 'fail');
-    } else {
-      log2('✓ Playback started.', 'pass');
+      win.__selftest_toggleShuffle();
+      await sleep(200);
+      const shuffleState = state();
+      line(liveReport, `Shuffle toggled on (shuffle = ${shuffleState.shuffle}).`);
+      win.__selftest_ytNext();
+      await sleep(1500);
+      const afterShuffleNext = state();
+      line(liveReport, `<span class="ok">✓</span> Next with shuffle on ran without throwing (index now ${afterShuffleNext.ytIdx}).`);
+      win.__selftest_toggleShuffle(); // turn back off
 
-      let st = getState();
-      const idxBefore = st.ytIdx, vidBefore = st.ytPlayer.getVideoData().video_id;
-      doc.getElementById('btn-next').dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-      await wait(1500);
-      st = getState();
-      const idxAfter = st.ytIdx, vidAfter = (()=>{ try{ return st.ytPlayer.getVideoData().video_id; }catch(e){ return null; } })();
-      const nextOk = idxAfter !== idxBefore && vidAfter !== vidBefore;
-      log2((nextOk?'✓':'✗') + ' Next: index ' + idxBefore + '→' + idxAfter + ', video ' + vidBefore + '→' + vidAfter, nextOk ? 'pass' : 'fail');
-
-      doc.getElementById('btn-prev').dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-      await wait(1500);
-      const idxAfterPrev = getState().ytIdx;
-      const prevOk = idxAfterPrev !== idxAfter;
-      log2((prevOk?'✓':'✗') + ' Prev: index ' + idxAfter + '→' + idxAfterPrev, prevOk ? 'pass' : 'fail');
-
-      const shuffleBtn = doc.getElementById('btn-shuffle');
-      shuffleBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-      await wait(200);
-      log2('Shuffle toggled on (shuffle = ' + getState().shuffle + ').');
-      doc.getElementById('btn-next').dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-      await wait(1500);
-      log2('✓ Next with shuffle on ran without throwing (index now ' + getState().ytIdx + ').', 'pass');
-      shuffleBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true})); // back off
-      await wait(150);
-
-      const loopBtn = doc.getElementById('btn-loop');
-      loopBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true}));
-      await wait(200);
-      log2('Loop toggled on (loop = ' + getState().loop + '). Seeking near the end of the current video…');
+      win.__selftest_toggleLoop();
+      await sleep(200);
+      const loopState = state();
+      line(liveReport, `Loop toggled on (loop = ${loopState.loop}). Seeking near the end of the current video…`);
       try{
-        const p = getState().ytPlayer;
-        const dur = p.getDuration();
-        p.seekTo(Math.max(0, dur - 2), true);
-      }catch(e){ log2('Could not seek: ' + e.message, 'fail'); }
-      const restarted = await pollUntil(()=>{
-        try{
-          const p = getState().ytPlayer;
-          const t = p.getCurrentTime(), ps = p.getPlayerState();
-          return (ps === 1 && t < 5) ? true : null;
-        }catch(e){ return null; }
-      }, 12000);
-      log2((restarted?'✓':'✗') + ' Loop ' + (restarted ? 'restarted the same video from the beginning.' : 'did NOT restart the video within 12s of it ending.'), restarted ? 'pass' : 'fail');
-      loopBtn.dispatchEvent(new win.MouseEvent('click', {bubbles:true})); // back off
-    }
-  }
-
-  section2('--- Errors captured during live test ---');
-  if(errors.length) errors.forEach(e=>log2(e, 'fail'));
-  else log2('None.', 'pass');
-
-  summaryEl2.innerHTML = errors.length
-    ? `<span class="fail">✗ ${errors.length} error event(s) captured</span> — see report above`
-    : `<span class="pass">✓ No JS errors during the live session</span>`;
-
-  runBtn2.disabled = false;
-}
-
-runBtn2.addEventListener('click', ()=>runLiveTest().catch(e=>{
-  log2('Test harness itself crashed: ' + e.message, 'fail');
-  runBtn2.disabled = false;
-}));
-</script>
-
-
-<script>
-const reportEl = document.getElementById('report');
-const summaryEl = document.getElementById('summary');
-const runBtn = document.getElementById('run');
-
-function log(msg, cls){
-  const d = document.createElement('div');
-  if(cls) d.className = cls;
-  d.textContent = msg;
-  reportEl.appendChild(d);
-  reportEl.scrollTop = reportEl.scrollHeight;
-}
-function section(msg){ log(msg, 'section'); }
-function wait(ms){ return new Promise(r=>setTimeout(r, ms)); }
-
-async function runTest(){
-  runBtn.disabled = true;
-  reportEl.innerHTML = '';
-  summaryEl.textContent = '';
-  const errors = [];
-  const iframe = document.getElementById('app');
-
-  section('Loading index.html…');
-  try{
-    await new Promise((resolve, reject)=>{
-      const t = setTimeout(()=>reject(new Error('iframe never fired onload after 15s')), 15000);
-      iframe.onload = ()=>{ clearTimeout(t); resolve(); };
-      iframe.src = 'index.html?_selftest=' + Date.now();
-    });
-  }catch(e){
-    log('FATAL: could not load index.html in iframe — ' + e.message, 'fail');
-    log('(If you opened this file directly from disk, browsers often block cross-frame access on file:// URLs. Try hosting both files — e.g. your GitHub Pages URL — and open selftest.html from there instead.)', 'note');
-    runBtn.disabled = false;
-    return;
-  }
-
-  await wait(1500); // let the app's own init/boot logic settle
-
-  let win, doc;
-  try{
-    win = iframe.contentWindow;
-    doc = iframe.contentDocument;
-    if(!doc) throw new Error('contentDocument is null (likely a cross-origin restriction)');
-  }catch(e){
-    log('FATAL: cannot access iframe contents — ' + e.message, 'fail');
-    log('This usually means the page is being viewed from a different origin than index.html. Serve both files from the same host.', 'note');
-    runBtn.disabled = false;
-    return;
-  }
-
-  // Capture errors going forward
-  win.addEventListener('error', e=>{
-    errors.push({type:'error', msg:e.message + (e.filename ? ' @ ' + e.filename.split('/').pop() + ':' + e.lineno : ''), ts:Date.now()});
-  });
-  win.addEventListener('unhandledrejection', e=>{
-    errors.push({type:'promise', msg:String(e.reason && e.reason.message || e.reason), ts:Date.now()});
-  });
-  const origErr = win.console.error.bind(win.console);
-  win.console.error = (...args)=>{
-    errors.push({type:'console.error', msg:args.map(a=>{try{return typeof a==='string'?a:JSON.stringify(a);}catch(_){return String(a);}}).join(' '), ts:Date.now()});
-    origErr(...args);
-  };
-
-  async function exercise(el, label, action){
-    const before = errors.length;
-    try{
-      await action();
-    }catch(e){
-      errors.push({type:'thrown', msg:e.message, ts:Date.now()});
-    }
-    await wait(150); // let synchronous handlers + immediate microtasks/timeouts settle
-    const newErrs = errors.slice(before);
-    if(newErrs.length){
-      log(`FAIL  [${label}]  →  ${newErrs.map(x=>`(${x.type}) ${x.msg}`).join('  |  ')}`, 'fail');
+        if (win.ytPlayer && win.ytPlayer.seekTo) win.ytPlayer.seekTo(9999, true);
+      }catch(e){}
+      await sleep(2500);
+      const afterLoop = state();
+      if (afterLoop.ytQVid === loopState.ytQVid){
+        line(liveReport, '<span class="ok">✓</span> Loop kept the same video active (did not skip to next).');
+      } else {
+        line(liveReport, '<span class="warn">⚠</span> Video changed even with loop on — check loop handling.');
+      }
+      win.__selftest_toggleLoop(); // turn back off
     } else {
-      log(`ok    [${label}]`, 'pass');
+      line(liveReport, '<span class="bad">✗</span> Playback never reached "playing" state within 10s.');
     }
-    return newErrs.length === 0;
   }
 
-  let passCount = 0, failCount = 0;
+  // ---- Step 3: 3D model search backends ----
+  line(liveReport, '\n--- 3D Model search backends ---');
+  goto('add'); // any page with the settings drawer isn't needed; model search lives in Now Playing → 3D Model tab
+  // Open Now Playing so the model tab controls exist in the DOM
+  const npToggle = doc.getElementById('np-settings-toggle');
+  const pbExpand = doc.getElementById('pb-expand');
+  if (pbExpand) pbExpand.click();
+  await sleep(300);
+  if (npToggle) npToggle.click();
+  await sleep(300);
+  const modelSubtab = doc.querySelector('.subtab-btn[data-subtab="model"]');
+  if (modelSubtab) modelSubtab.click();
+  await sleep(200);
 
-  // ---- Buttons ----
-  section('--- Buttons ---');
-  const buttons = [...doc.querySelectorAll('button')];
-  log(`Found ${buttons.length} <button> elements.`);
-  for(const el of buttons){
-    const label = el.id || (el.textContent||'').trim().slice(0,40) || el.className || '(unlabeled button)';
-    const ok = await exercise(el, label, ()=>{ el.dispatchEvent(new win.MouseEvent('click', {bubbles:true, cancelable:true})); });
-    ok ? passCount++ : failCount++;
+  async function testModelSource(srcBtnId, label){
+    const srcBtn = doc.getElementById(srcBtnId);
+    if (srcBtn) srcBtn.click();
+    await sleep(150);
+    setVal('poly-search-input', 'car');
+    click('poly-search-btn');
+    await sleep(3500);
+    const statusEl = doc.getElementById('poly-search-status') || doc.querySelector('.model-search-status');
+    const resultsEl = doc.getElementById('poly-search-results') || doc.querySelector('.poly-results, .model-results');
+    const count = resultsEl ? resultsEl.children.length : 'unknown (results container id not found)';
+    line(liveReport, `${label}: status="${esc(statusEl ? statusEl.textContent : '(no status element found)')}", ${count} result(s) rendered.`);
   }
+  await testModelSource('src-btn-polypizza', 'Poly Pizza');
+  await testModelSource('src-btn-icosa', 'Icosa Gallery');
 
-  // ---- Checkboxes ----
-  section('--- Checkboxes ---');
-  const checks = [...doc.querySelectorAll('input[type=checkbox]')];
-  log(`Found ${checks.length} checkboxes.`);
-  for(const el of checks){
-    const label = 'checkbox:' + (el.id || el.name || '(unlabeled)');
-    const ok = await exercise(el, label, ()=>{
-      el.checked = !el.checked;
-      el.dispatchEvent(new win.Event('change', {bubbles:true}));
-    });
-    ok ? passCount++ : failCount++;
-  }
-
-  // ---- Range / number sliders ----
-  section('--- Sliders / number inputs ---');
-  const ranges = [...doc.querySelectorAll('input[type=range], input[type=number]')];
-  log(`Found ${ranges.length} range/number inputs.`);
-  for(const el of ranges){
-    const label = 'input:' + (el.id || el.name || '(unlabeled)');
-    const original = el.value;
-    const ok = await exercise(el, label, ()=>{
-      el.value = el.max !== '' ? el.max : (Number(original)+1);
-      el.dispatchEvent(new win.Event('input', {bubbles:true}));
-      el.dispatchEvent(new win.Event('change', {bubbles:true}));
-    });
-    ok ? passCount++ : failCount++;
-  }
-
-  // ---- Dropdowns ----
-  section('--- Dropdowns ---');
-  const selects = [...doc.querySelectorAll('select')];
-  log(`Found ${selects.length} <select> elements.`);
-  for(const el of selects){
-    const label = 'select:' + (el.id || el.name || '(unlabeled)');
-    let allOk = true;
-    for(const opt of [...el.options]){
-      const ok = await exercise(el, `${label} = "${opt.value}"`, ()=>{
-        el.value = opt.value;
-        el.dispatchEvent(new win.Event('change', {bubbles:true}));
-      });
-      if(!ok) allOk = false;
-    }
-    allOk ? passCount++ : failCount++;
-  }
-
-  // ---- Text inputs (just focus/blur/type a char, don't submit anything) ----
-  section('--- Text inputs (focus/type/blur only) ---');
-  const texts = [...doc.querySelectorAll('input[type=text], input[type=search], input:not([type])')];
-  log(`Found ${texts.length} text-like inputs.`);
-  for(const el of texts){
-    const label = 'text:' + (el.id || el.name || '(unlabeled)');
-    const ok = await exercise(el, label, ()=>{
-      el.focus();
-      el.value = 'test';
-      el.dispatchEvent(new win.Event('input', {bubbles:true}));
-      el.blur();
-    });
-    ok ? passCount++ : failCount++;
-  }
-
-  section('--- Done ---');
-  log(`${passCount} passed, ${failCount} flagged, ${errors.length} total error event(s) captured.`);
-  if(failCount === 0){
-    summaryEl.innerHTML = `<span class="pass">✓ No errors caught across ${passCount} interactions</span>`;
+  // ---- Errors captured ----
+  line(liveReport, '\n--- Errors captured during live test ---');
+  if (errorsSeen.length){
+    errorsSeen.slice(0, 15).forEach(e => line(liveReport, esc(e)));
   } else {
-    summaryEl.innerHTML = `<span class="fail">✗ ${failCount} control(s) threw errors</span> — see report above`;
+    line(liveReport, 'None.');
   }
 
-  runBtn.disabled = false;
+  runLiveBtn.disabled = false;
 }
 
-runBtn.addEventListener('click', ()=>runTest().catch(e=>{
-  log('Test harness itself crashed: ' + e.message, 'fail');
-  runBtn.disabled = false;
-}));
+runBlindBtn.addEventListener('click', () => runBlindTest().catch(e => line(blindReport, '\n<span class="bad">Harness error: ' + esc(errText(e)) + '</span>')));
+runLiveBtn.addEventListener('click', () => runLiveTest().catch(e => line(liveReport, '\n<span class="bad">Harness error: ' + esc(errText(e)) + '</span>')));
 </script>
 </body>
 </html>
