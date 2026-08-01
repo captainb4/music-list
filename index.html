@@ -2129,6 +2129,28 @@ function updatePolyCredit(){
     el.textContent=`"${m.title}" — via ${src} (${m.license||'CC0'})`;
   }
 }
+// Quick pre-flight check for whether a model URL is actually fetchable from
+// the browser. Mirrors the same CORS restriction the GLTF/OBJ loaders will
+// hit, but is cheap (range request for 1 byte) so we can run it across all
+// results before showing them, instead of finding out after a click.
+async function isModelReachable(url){
+  try{
+    const res=await fetch(url,{method:'GET',mode:'cors',headers:{Range:'bytes=0-0'}});
+    // An opaque/CORS-blocked request throws before we get here; a normal
+    // response (even a 4xx/5xx from the host) means CORS itself is fine.
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+// Filters a list of search results down to the ones that are actually
+// loadable, running the reachability checks in parallel.
+async function filterReachableModels(list,statusEl,sourceLabel){
+  if(!list.length) return list;
+  if(statusEl) statusEl.textContent=`checking ${list.length} result(s) from ${sourceLabel}...`;
+  const flags=await Promise.all(list.map(m=>isModelReachable(m.downloadUrl)));
+  return list.filter((m,i)=>flags[i]);
+}
 document.querySelectorAll('.src-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     currentSearchSource = btn.dataset.src;
@@ -2144,9 +2166,15 @@ document.getElementById('poly-search-btn').addEventListener('click', async ()=>{
   statusEl.textContent='searching...';
   document.getElementById('poly-search-results').innerHTML='';
   try{
-    const list = currentSearchSource==='icosa' ? await searchIcosaModels(q) : await searchPolyPizzaModels(q);
+    const rawList = currentSearchSource==='icosa' ? await searchIcosaModels(q) : await searchPolyPizzaModels(q);
     const sourceLabel = currentSearchSource==='icosa' ? 'Icosa Gallery' : 'Poly Pizza';
-    statusEl.textContent = list.length ? `${list.length} result(s) from ${sourceLabel}` : `no results found on ${sourceLabel}.`;
+    const list = await filterReachableModels(rawList, statusEl, sourceLabel);
+    const skipped = rawList.length - list.length;
+    statusEl.textContent = list.length
+      ? `${list.length} result(s) from ${sourceLabel}${skipped?` (${skipped} hidden — not directly loadable)`:''}`
+      : rawList.length
+        ? `found ${rawList.length} result(s) on ${sourceLabel}, but none are directly loadable from a browser.`
+        : `no results found on ${sourceLabel}.`;
     renderPolyResults(list);
   }catch(e){
     console.error(e);
