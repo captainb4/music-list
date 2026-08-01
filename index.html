@@ -465,6 +465,7 @@ header{flex:0 0 auto}
               <button class="subtab-btn" data-subtab="colors">Colors</button>
               <button class="subtab-btn" data-subtab="voxelgrid">Voxel Grid</button>
               <button class="subtab-btn" data-subtab="model">3D Model</button>
+              <button class="subtab-btn" data-subtab="presets">Presets</button>
             </div>
 
             <div class="subtab-pane active" data-subpane="vizmode">
@@ -525,6 +526,7 @@ header{flex:0 0 auto}
                 <div class="drop-text">or drop your own <strong style="color:var(--accent3)">.obj .glb .gltf</strong></div>
               </div>
               <div class="model-info" id="model-info"></div>
+              <button id="remove-model-btn" class="px-btn" style="display:none;width:100%;margin-top:6px;border-color:var(--accent2);color:var(--accent2)">✕ Remove Model</button>
               <div id="model-ctrl">
                 <div class="toggle-row" style="margin-top:10px"><span class="ctrl-label">Show Model</span><label class="toggle"><input type="checkbox" id="show-model" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
                 <div class="toggle-row"><span class="ctrl-label">Wireframe</span><label class="toggle"><input type="checkbox" id="model-wire"><div class="ttrack"></div></label></div>
@@ -532,7 +534,6 @@ header{flex:0 0 auto}
                 <div class="control"><div class="ctrl-row"><span class="ctrl-label">Model Scale</span><span class="ctrl-val" id="val-mscale" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-size" min="0.2" max="5" value="1.0" step="0.1"></div>
                 <div class="control"><div class="ctrl-row"><span class="ctrl-label">Opacity</span><span class="ctrl-val" id="val-mopacity" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-opacity" min="0.05" max="1" value="1.0" step="0.05"></div>
                 <div class="control"><div class="ctrl-row"><span class="ctrl-label">Emissive Boost</span><span class="ctrl-val" id="val-emissive" style="color:var(--accent3)">0.5</span></div><input type="range" id="emissive-amt" min="0" max="2" value="0.5" step="0.05"></div>
-                <button id="remove-model-btn" class="px-btn" style="width:100%;margin-top:4px;border-color:var(--accent2);color:var(--accent2)">✕ Remove Model</button>
                 <!-- Model's own camera/render controls — same set as the Voxel
                      Grid tab, but wired to the model independently so you're
                      not stuck bouncing to another tab to adjust rotation,
@@ -548,44 +549,50 @@ header{flex:0 0 auto}
                 <div class="color-row"><span class="ctrl-label">Background</span><input type="color" id="model-col-bg" value="#0d0f0b"></div>
               </div>
             </div>
-          </div>
-          <!-- PRESETS — Device (local browser) and Public (account-based, tied to an album/playlist/song) -->
-          <div class="panel">
-            <div class="lib-status" style="margin-top:0">import a preset file someone sent you — it loads into the visualizer below, then save it to Device or Public</div>
-            <input type="file" id="preset-import-input" accept="application/json,.json" style="display:none">
-            <button class="lib-btn" id="preset-import-btn" style="margin-top:6px;border-color:var(--accent3);color:var(--accent3)">⬆ IMPORT PRESET FILE</button>
-            <div class="lib-status" id="preset-import-status"></div>
-            <div style="margin:12px 0;border-top:1px solid var(--border)"></div>
-            <div class="subtab-nav">
-              <button class="subtab-btn active" data-subtab="presets-device">Device</button>
-              <button class="subtab-btn" data-subtab="presets-public">Public</button>
-            </div>
 
-            <div class="subtab-pane active" data-subpane="presets-device">
-              <div class="lib-status" style="margin-top:0">saved only in this browser — not shared with anyone</div>
-              <div class="lib-field" style="margin-bottom:6px">
-                <input type="text" id="preset-name" class="lib-input" placeholder="preset name...">
-              </div>
-              <button class="lib-btn" id="preset-save-btn" style="margin-top:0">SAVE CURRENT SETTINGS</button>
-              <div class="lib-status" id="preset-status"></div>
-              <div class="playlist-list" id="preset-list" style="margin-top:6px"></div>
-            </div>
+            <!-- PRESETS — Device (local browser) and Public (account-based, tied to an album/playlist/song).
+                 Nested in its own .panel wrapper (no border/padding of its own) so its
+                 Device/Public subtabs switch independently of the Viz Mode/Colors/Voxel
+                 Grid/3D Model tabs above. -->
+            <div class="subtab-pane" data-subpane="presets">
+              <div class="panel" style="border:none;padding:0">
+                <div class="lib-status" style="margin-top:0">import a preset file someone sent you — it loads into the visualizer below, then save it to Device or Public</div>
+                <input type="file" id="preset-import-input" accept="application/json,.json" style="display:none">
+                <button class="lib-btn" id="preset-import-btn" style="margin-top:6px;border-color:var(--accent3);color:var(--accent3)">⬆ IMPORT PRESET FILE</button>
+                <div class="lib-status" id="preset-import-status"></div>
+                <div style="margin:12px 0;border-top:1px solid var(--border)"></div>
+                <div class="subtab-nav">
+                  <button class="subtab-btn active" data-subtab="presets-device">Device</button>
+                  <button class="subtab-btn" data-subtab="presets-public">Public</button>
+                </div>
 
-            <div class="subtab-pane" data-subpane="presets-public">
-              <div class="subtab-nav" id="preset-scope-nav">
-                <button class="subtab-btn active" data-scope="context">Album / Playlist</button>
-                <button class="subtab-btn" data-scope="track">Current Song</button>
-              </div>
-              <div class="lib-status" style="margin-top:0" id="cloud-preset-context-line">open an album or playlist to see (and share) presets for it.</div>
-              <div id="cloud-preset-body" style="display:none">
-                <div class="panel-title" style="margin-bottom:8px">Presets for "<span id="cloud-preset-context-name" style="color:var(--accent)"></span>"</div>
-                <div class="playlist-list" id="cloud-preset-list"></div>
-                <div id="cloud-preset-save-area" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+                <div class="subtab-pane active" data-subpane="presets-device">
+                  <div class="lib-status" style="margin-top:0">saved only in this browser — not shared with anyone</div>
                   <div class="lib-field" style="margin-bottom:6px">
-                    <input type="text" id="cloud-preset-name" class="lib-input" placeholder="name this preset...">
+                    <input type="text" id="preset-name" class="lib-input" placeholder="preset name...">
                   </div>
-                  <button class="lib-btn" id="cloud-preset-save-btn" style="margin-top:0">PUBLISH PRESET</button>
-                  <div class="lib-status" id="cloud-preset-status"></div>
+                  <button class="lib-btn" id="preset-save-btn" style="margin-top:0">SAVE CURRENT SETTINGS</button>
+                  <div class="lib-status" id="preset-status"></div>
+                  <div class="playlist-list" id="preset-list" style="margin-top:6px"></div>
+                </div>
+
+                <div class="subtab-pane" data-subpane="presets-public">
+                  <div class="subtab-nav" id="preset-scope-nav">
+                    <button class="subtab-btn active" data-scope="context">Album / Playlist</button>
+                    <button class="subtab-btn" data-scope="track">Current Song</button>
+                  </div>
+                  <div class="lib-status" style="margin-top:0" id="cloud-preset-context-line">open an album or playlist to see (and share) presets for it.</div>
+                  <div id="cloud-preset-body" style="display:none">
+                    <div class="panel-title" style="margin-bottom:8px">Presets for "<span id="cloud-preset-context-name" style="color:var(--accent)"></span>"</div>
+                    <div class="playlist-list" id="cloud-preset-list"></div>
+                    <div id="cloud-preset-save-area" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+                      <div class="lib-field" style="margin-bottom:6px">
+                        <input type="text" id="cloud-preset-name" class="lib-input" placeholder="name this preset...">
+                      </div>
+                      <button class="lib-btn" id="cloud-preset-save-btn" style="margin-top:0">PUBLISH PRESET</button>
+                      <div class="lib-status" id="cloud-preset-status"></div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1904,15 +1911,21 @@ function renderFrame(ts){
 // ═══════════════════════════════════════════════════════════
 //  THREE.JS 3D MODEL VISUALIZER
 // ═══════════════════════════════════════════════════════════
-let threeR=null,threeS=null,threeC=null,modelRoot=null,modelMeshes=[];
+let threeR=null,threeS=null,threeC=null,modelRig=null,modelRoot=null,modelMeshes=[];
 let modelRotY=0,lastThreeT=0; // model's own auto-rotate angle and frame clock, kept separate from the voxel view's rotY/dt
+const MODEL_CAM_DIST=4, MODEL_BASE_FOV=50, MODEL_BASE_ZOOM=.45; // matches the voxel canvas's default zoom (view.zoom) so the two line up at the default view
 
 function initThree(){
   if(threeR)return;
   const tc=document.getElementById('three-canvas'),wrap=tc.parentElement;
   threeS=new THREE.Scene();
-  threeC=new THREE.PerspectiveCamera(50,wrap.clientWidth/wrap.clientHeight,.01,500);
-  threeC.position.set(0,0,4);
+  threeC=new THREE.PerspectiveCamera(MODEL_BASE_FOV,wrap.clientWidth/wrap.clientHeight,.01,500);
+  // Camera stays put — rotation/pan/zoom are applied to the model itself
+  // (see updateThreeRig) so it tracks the voxel grid's own rotVec()-based
+  // rotation exactly, instead of two independently-orbiting cameras that
+  // only agreed with each other at the default view.
+  threeC.position.set(0,0,MODEL_CAM_DIST);
+  threeC.lookAt(0,0,0);
   threeR=new THREE.WebGLRenderer({canvas:tc,alpha:true,antialias:true});
   threeR.setPixelRatio(window.devicePixelRatio||1);
   threeR.setSize(wrap.clientWidth,wrap.clientHeight);
@@ -1922,13 +1935,18 @@ function initThree(){
   threeS.userData.kl1=mkLight(0xaaff44,2.5,3,5,4);
   threeS.userData.kl2=mkLight(0xff4466,1.8,-3,-2,-3);
   threeS.userData.kl3=mkLight(0x44aaff,1.2,0,-4,2);
+  // Everything that should turn/pan/zoom together with the voxel grid —
+  // the model and its floor — lives inside this one rig group, so a single
+  // rotation applied to the rig keeps them both locked to the grid.
+  modelRig=new THREE.Group();
+  threeS.add(modelRig);
   // Model's own floor — a simple grid beneath the model, shown/hidden by
   // the model tab's "Show Floor" toggle, independent of the voxel canvas's
   // floor (which is drawn in 2D and only applies to the voxel view).
   const modelFloor=new THREE.GridHelper(6,12,0xaaff44,0x224411);
   modelFloor.position.y=-1.3;
   modelFloor.visible=false;
-  threeS.add(modelFloor);
+  modelRig.add(modelFloor);
   threeS.userData.modelFloor=modelFloor;
   threeS.userData.bgColor=new THREE.Color();
   window.addEventListener('resize',()=>{
@@ -1938,30 +1956,31 @@ function initThree(){
   threeLoop();
 }
 
-// Orbits the 3D model camera using the exact same rotX/rotY/zoom/pan state
-// the voxel canvas's mouse controls already maintain (see the mousedown/
-// mousemove/wheel listeners near the bottom of the file) — so drag-to-
-// rotate, scroll-to-zoom, and right-drag-to-pan work identically whether
-// you're looking at the voxels or a loaded 3D model, with no separate
-// control scheme to learn.
-const THREE_CAM_BASE_DIST = 1.8; // matches the camera's original fixed z=4 at the default zoom of .45
-function updateThreeCamera(){
-  if(!threeC)return;
-  const dist = THREE_CAM_BASE_DIST / Math.max(.05, view.zoom);
-  const elev = Math.max(-1.5, Math.min(1.5, view.rotX)); // clamp so it can't flip over the poles
-  const azim = view.rotY;
-  const x = dist * Math.sin(azim) * Math.cos(elev);
-  const y = dist * Math.sin(elev);
-  const z = dist * Math.cos(azim) * Math.cos(elev);
-  const tx = -view.panX * 0.003, ty = view.panY * 0.003; // small screen-drag → world-space pan
-  threeC.position.set(tx + x, ty + y, z);
-  threeC.lookAt(tx, ty, 0);
+// Rotates the model rig using the exact same rotation the voxel grid uses
+// (rotVec: Y first, then X — see proj()/rotVec() above) instead of orbiting
+// the camera, so drag-to-rotate turns the model in perfect sync with the
+// grid. Zoom is applied as a focal-length change (matching the voxel
+// canvas's projection, which scales rather than dollies), and pan is a
+// plain CSS pixel offset on the canvas element — identical to how the 2D
+// projection adds panX/panY after projecting, so the two never drift apart.
+const _qy=new THREE.Quaternion(), _qx=new THREE.Quaternion(), _axisY=new THREE.Vector3(0,1,0), _axisX=new THREE.Vector3(1,0,0);
+function updateThreeRig(){
+  if(!threeC||!modelRig)return;
+  _qy.setFromAxisAngle(_axisY, view.rotY);
+  _qx.setFromAxisAngle(_axisX, view.rotX);
+  modelRig.quaternion.copy(_qx).multiply(_qy); // apply Y rotation first, then X — matches rotVec()
+  const z=Math.max(.05,view.zoom);
+  let fov=2*(Math.atan(Math.tan(MODEL_BASE_FOV/2*Math.PI/180)*(MODEL_BASE_ZOOM/z))*180/Math.PI);
+  fov=Math.max(2,Math.min(170,fov));
+  if(Math.abs(threeC.fov-fov)>.01){ threeC.fov=fov; threeC.updateProjectionMatrix(); }
+  const tc=document.getElementById('three-canvas');
+  if(tc) tc.style.transform=`translate(${view.panX}px,${view.panY}px)`;
 }
 function threeLoop(ts){
   requestAnimationFrame(threeLoop);
   if(!threeR)return;
   const dt=Math.min(.1,(ts-lastThreeT)/1000)||0; lastThreeT=ts;
-  updateThreeCamera();
+  updateThreeRig();
   const modelActive=modelRoot&&document.getElementById('show-model').checked;
   const floorGrid=threeS.userData.modelFloor;
   if(!modelActive){
@@ -2050,8 +2069,8 @@ function onModelLoaded(obj,fname){
   const sz=box.getSize(new THREE.Vector3());
   obj.position.sub(ctr);
   obj.scale.multiplyScalar(2.4/Math.max(sz.x,sz.y,sz.z)||1);
-  if(modelRoot)threeS.remove(modelRoot);
-  modelRoot=new THREE.Group();modelRoot.add(obj);threeS.add(modelRoot);
+  if(modelRoot)modelRig.remove(modelRoot);
+  modelRoot=new THREE.Group();modelRoot.add(obj);modelRig.add(modelRoot);
   modelMeshes=[];
   obj.traverse(c=>{
     if(!c.isMesh)return;
@@ -2061,11 +2080,12 @@ function onModelLoaded(obj,fname){
     c.material=new THREE.MeshPhongMaterial({color:0xaaff44,emissive:0x112200,shininess:80,side:THREE.DoubleSide,transparent:true,opacity:+document.getElementById('model-opacity').value});
     modelMeshes.push(c);
   });
-  if(!modelMeshes.length){alert('No meshes found in model.');threeS.remove(modelRoot);modelRoot=null;return;}
+  if(!modelMeshes.length){alert('No meshes found in model.');modelRig.remove(modelRoot);modelRoot=null;return;}
   document.getElementById('model-ctrl').style.display='block';
   document.getElementById('three-canvas').style.display='block';
   document.getElementById('model-info').style.display='block';
   document.getElementById('model-info').textContent=`✓ ${fname} (${modelMeshes.length} mesh${modelMeshes.length>1?'es':''})`;
+  document.getElementById('remove-model-btn').style.display='block';
   document.getElementById('model-hud').style.display='block';
   document.getElementById('model-hud-name').textContent=fname;
   updateWire();
@@ -2253,11 +2273,12 @@ document.getElementById('poly-search-btn').addEventListener('click', async ()=>{
 });
 
 function removeModel(){
-  if(modelRoot){threeS.remove(modelRoot);modelRoot=null;}modelMeshes=[];
+  if(modelRoot){modelRig.remove(modelRoot);modelRoot=null;}modelMeshes=[];
   currentPolyModel = null;
   document.getElementById('three-canvas').style.display='none';
   document.getElementById('model-ctrl').style.display='none';
   document.getElementById('model-info').style.display='none';
+  document.getElementById('remove-model-btn').style.display='none';
   document.getElementById('model-hud').style.display='none';
 }
 
@@ -2312,15 +2333,15 @@ document.querySelectorAll('.subtab-btn[data-subtab]').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const scope=btn.closest('.panel');
     const tab=btn.dataset.subtab;
-    scope.querySelectorAll('.subtab-btn').forEach(b=>b.classList.toggle('active', b===btn));
-    scope.querySelectorAll('.subtab-pane').forEach(p=>p.classList.toggle('active', p.dataset.subpane===tab));
+    scope.querySelectorAll(':scope > .subtab-nav > .subtab-btn').forEach(b=>b.classList.toggle('active', b===btn));
+    scope.querySelectorAll(':scope > .subtab-pane').forEach(p=>p.classList.toggle('active', p.dataset.subpane===tab));
   });
 });
 
 // ---- Show/hide the voxel grid independently of the 3D model ----
 // Uses opacity, not display:none — the voxel canvas is also the input
 // surface for drag-to-rotate/scroll-to-zoom/right-drag-to-pan (the 3D
-// model's camera reads that same state in updateThreeCamera()). An element
+// model's rig reads that same state in updateThreeRig()). An element
 // with display:none stops receiving mouse events entirely, which silently
 // broke camera control whenever voxels were hidden to look at just a model.
 function toggleVoxelVis(){
