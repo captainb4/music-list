@@ -1069,11 +1069,27 @@ let currentPlayContext = null; // {type:'album'|'playlist', id, name} — set wh
 let currentPolyModel = null;   // {title,thumbnail,downloadUrl,license,author,attribution} if the loaded 3D model came from Poly Pizza search — cleared on local upload/remove
 
 // ---- YouTube album search (search for full-album playlists) ----
+async function ytErrorDetail(res){
+  try{
+    const body = await res.clone().json();
+    // Supabase edge functions typically pass through Google's error shape:
+    // { error: { code, message, errors: [{ reason, message }] } }
+    const g = body && body.error;
+    if(g){
+      const reason = g.errors && g.errors[0] && g.errors[0].reason;
+      return g.message + (reason ? ' [' + reason + ']' : '');
+    }
+    if(body && body.message) return body.message;
+    return JSON.stringify(body).slice(0, 200);
+  }catch(e){
+    try{ return (await res.clone().text()).slice(0, 200); }catch(_){ return ''; }
+  }
+}
 async function searchYouTubeAlbums(term){
   if(!YT_SEARCH_CONFIGURED) throw new Error('no YouTube search backend configured');
   const url = `${YT_SEARCH_URL}?endpoint=search&part=snippet&type=playlist&maxResults=12&q=${encodeURIComponent(term + ' full album')}`;
   const res = await fetch(url);
-  if(!res.ok) throw new Error('YouTube search failed (' + res.status + ')');
+  if(!res.ok) throw new Error('YouTube search failed (' + res.status + '): ' + await ytErrorDetail(res));
   const data = await res.json();
   return (data.items || [])
     .filter(it => it.id && it.id.playlistId)
@@ -1096,7 +1112,7 @@ async function fetchYouTubePlaylistTracks(playlistId){
   do{
     const url = `${YT_SEARCH_URL}?endpoint=playlistItems&part=snippet,contentDetails&maxResults=50&playlistId=${encodeURIComponent(playlistId)}` + (pageToken ? '&pageToken=' + pageToken : '');
     const res = await fetch(url);
-    if(!res.ok) throw new Error('could not load playlist tracks (' + res.status + ')');
+    if(!res.ok) throw new Error('could not load playlist tracks (' + res.status + '): ' + await ytErrorDetail(res));
     const data = await res.json();
     items = items.concat(data.items || []);
     pageToken = data.nextPageToken || '';
@@ -1134,7 +1150,7 @@ async function searchYouTubeVideoId(query){
   try{
     const url = `${YT_SEARCH_URL}?endpoint=search&part=snippet&type=video&maxResults=1&videoCategoryId=10&q=${encodeURIComponent(query)}`;
     const res = await fetch(url);
-    if(!res.ok) return null;
+    if(!res.ok){ console.error('YouTube search failed (' + res.status + '): ' + await ytErrorDetail(res)); return null; }
     const data = await res.json();
     const item = (data.items||[])[0];
     return item ? item.id.videoId : null;
