@@ -242,6 +242,23 @@ header{flex:0 0 auto}
 .album-card .ac-title{font-size:11px;color:var(--text);padding:8px 10px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .album-card .ac-artist{font-size:10px;color:var(--muted);padding:2px 10px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
+.profile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-top:6px}
+.profile-card{cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;transition:all .15s}
+.profile-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.4)}
+.pc-avatar{width:44px;height:44px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'VT323',monospace;font-size:20px;color:var(--accent)}
+.pc-name{font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pc-admin{font-size:8px;color:var(--accent);border:1px solid var(--accent);padding:1px 4px;border-radius:2px;letter-spacing:1px;margin-left:2px;vertical-align:1px}
+
+.pm-head{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.pm-avatar{width:52px;height:52px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'VT323',monospace;font-size:24px;color:var(--accent);flex-shrink:0}
+.pm-section{margin-top:18px}
+.pm-section-title{font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px}
+.profile-fav-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px}
+.profile-fav-card{cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:4px;overflow:hidden;transition:all .15s}
+.profile-fav-card:hover{border-color:var(--accent)}
+.profile-fav-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:var(--surface2)}
+.pfc-title{font-size:9px;color:var(--text);padding:5px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
 /* ── Docked player bar (footer) ───────── */
 .player-bar{flex:0 0 auto;display:flex;align-items:center;gap:20px;background:var(--surface);border-top:2px solid var(--border);padding:9px 20px;z-index:50}
 .pb-now{display:flex;align-items:center;gap:10px;min-width:150px;max-width:260px;flex:1 1 220px}
@@ -385,9 +402,19 @@ header{flex:0 0 auto}
 
       <!-- COMMUNITY -->
       <section class="page" id="page-community">
-        <div class="page-head"><h1>Community</h1><span class="page-sub">public playlists other people have shared, with their visualizer presets</span></div>
+        <div class="page-head"><h1>Community</h1><span class="page-sub">public playlists, people, and shared visualizer presets</span></div>
         <div class="panel">
-          <div class="playlist-list" id="community-list"></div>
+          <div class="subtab-nav">
+            <button class="subtab-btn active" data-subtab="community-playlists">Playlists</button>
+            <button class="subtab-btn" data-subtab="community-profiles">Profiles</button>
+          </div>
+          <div class="subtab-pane active" data-subpane="community-playlists">
+            <div class="playlist-list" id="community-list"></div>
+          </div>
+          <div class="subtab-pane" data-subpane="community-profiles">
+            <input type="text" id="profiles-search" class="lib-input search-input" placeholder="Filter people..." style="margin-bottom:10px">
+            <div class="profile-grid" id="community-profiles-grid"></div>
+          </div>
         </div>
       </section>
 
@@ -678,12 +705,37 @@ header{flex:0 0 auto}
         <div class="modal-tags" id="modal-tags"></div>
         <div class="modal-actions">
           <button class="lib-btn" id="modal-play-all" style="width:auto;padding:6px 12px;margin-top:0">▶ PLAY ALL</button>
+          <button class="lib-btn" id="modal-fav" style="width:auto;padding:6px 12px;margin-top:0;display:none">♡ FAVORITE</button>
           <button class="lib-btn" id="modal-edit" style="width:auto;padding:6px 12px;margin-top:0;display:none;border-color:var(--accent3);color:var(--accent3)">✎ EDIT ALBUM</button>
           <button class="lib-btn" id="modal-delete" style="width:auto;padding:6px 12px;margin-top:0;display:none;border-color:var(--accent2);color:var(--accent2)">DELETE ALBUM</button>
         </div>
       </div>
     </div>
     <div class="modal-body" id="modal-tracklist"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="profile-modal">
+  <div class="modal">
+    <button class="modal-close" id="pm-close">✕</button>
+    <div class="pm-head">
+      <div class="pm-avatar" id="pm-avatar">?</div>
+      <div class="modal-title" id="pm-username" style="margin:0"></div>
+    </div>
+    <div class="modal-body" style="margin-top:12px">
+      <div class="pm-section">
+        <div class="pm-section-title">Favorite Albums</div>
+        <div class="profile-fav-grid" id="pm-favorites"></div>
+      </div>
+      <div class="pm-section">
+        <div class="pm-section-title">Public Playlists</div>
+        <div class="playlist-list" id="pm-playlists"></div>
+      </div>
+      <div class="pm-section">
+        <div class="pm-section-title">Shared Presets</div>
+        <div class="playlist-list" id="pm-presets"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1417,6 +1469,7 @@ function openAlbumModal(albumId){
   editBtn.style.borderColor = 'var(--accent3)'; editBtn.style.color = 'var(--accent3)';
   editBtn.textContent = '✎ EDIT ALBUM';
   editBtn.onclick = ()=> editLibAlbum(album.id);
+  refreshFavoriteButton(album.id);
 
   const queueList = album.tracks.map(t => ({...t, albums: {title:album.title, artist:album.artist, artwork_url:album.artwork_url}}));
   const listEl = document.getElementById('modal-tracklist');
@@ -1814,6 +1867,7 @@ async function openPlaylistModal(id, foreignData){
     ? `${p.playlist_tracks.length} track(s) · your playlist · ${p.is_public?'public':'private'}`
     : `${p.playlist_tracks.length} track(s) · by ${esc(p.profiles?.username||'someone')}`;
   document.getElementById('modal-tags').innerHTML = '';
+  document.getElementById('modal-fav').style.display = 'none';
   const delBtn = document.getElementById('modal-delete');
   const editBtn = document.getElementById('modal-edit');
   if(isOwner){
@@ -2890,7 +2944,140 @@ async function loadPublicPlaylists(){
   });
 }
 const communityNavBtn=document.querySelector('.rail-item[data-page="community"]');
-if(communityNavBtn) communityNavBtn.addEventListener('click', loadPublicPlaylists);
+if(communityNavBtn) communityNavBtn.addEventListener('click', ()=>{ loadPublicPlaylists(); loadCommunityProfiles(); });
+
+// ═══════════════════════════════════════════════════════════
+//  FAVORITE ALBUMS — heart a shared album; shows up on your profile
+// ═══════════════════════════════════════════════════════════
+async function refreshFavoriteButton(albumId){
+  const favBtn = document.getElementById('modal-fav');
+  if(!favBtn) return;
+  if(!libCurrentUser || !CONFIGURED){ favBtn.style.display = 'none'; return; }
+  favBtn.style.display = 'inline-block';
+  favBtn.disabled = true; favBtn.textContent = '…';
+  favBtn.style.color = ''; favBtn.style.borderColor = '';
+  const { data, error } = await sb.from('favorite_albums')
+    .select('user_id').eq('user_id', libCurrentUser.id).eq('album_id', albumId).maybeSingle();
+  if(error){ console.error(error); favBtn.disabled = false; favBtn.textContent = '♡ FAVORITE'; favBtn.onclick = ()=> toggleFavoriteAlbum(albumId, false); return; }
+  const isFav = !!data;
+  favBtn.disabled = false;
+  favBtn.textContent = isFav ? '♥ FAVORITED' : '♡ FAVORITE';
+  if(isFav){ favBtn.style.color = 'var(--accent2)'; favBtn.style.borderColor = 'var(--accent2)'; }
+  favBtn.onclick = ()=> toggleFavoriteAlbum(albumId, isFav);
+}
+async function toggleFavoriteAlbum(albumId, currentlyFav){
+  if(!libCurrentUser) return;
+  const favBtn = document.getElementById('modal-fav');
+  if(favBtn) favBtn.disabled = true;
+  const { error } = currentlyFav
+    ? await sb.from('favorite_albums').delete().eq('user_id', libCurrentUser.id).eq('album_id', albumId)
+    : await sb.from('favorite_albums').insert({ user_id: libCurrentUser.id, album_id: albumId });
+  if(error){ console.error(error); alert('could not update favorites — check console.'); if(favBtn) favBtn.disabled = false; return; }
+  refreshFavoriteButton(albumId);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  COMMUNITY — PROFILES: browse people, then view their
+//  favorite albums, public playlists, and shared presets
+// ═══════════════════════════════════════════════════════════
+let communityProfiles = [];
+async function loadCommunityProfiles(){
+  const grid = document.getElementById('community-profiles-grid');
+  if(!grid || !CONFIGURED) return;
+  grid.innerHTML = '<div class="empty-note">loading...</div>';
+  const { data, error } = await sb.from('profiles').select('id, username, is_admin').order('username');
+  if(error){ console.error(error); grid.innerHTML = '<div class="empty-note">could not load — check console.</div>'; return; }
+  communityProfiles = data || [];
+  renderCommunityProfiles();
+}
+function renderCommunityProfiles(){
+  const grid = document.getElementById('community-profiles-grid');
+  if(!grid) return;
+  const q = (document.getElementById('profiles-search').value || '').toLowerCase();
+  const list = communityProfiles.filter(p => !q || (p.username||'').toLowerCase().includes(q));
+  if(!list.length){ grid.innerHTML = '<div class="empty-note">no one here yet.</div>'; return; }
+  grid.innerHTML = list.map((p,i)=>`
+    <div class="profile-card" data-index="${i}">
+      <div class="pc-avatar">${esc((p.username||'?').slice(0,1).toUpperCase())}</div>
+      <div class="pc-name">${esc(p.username||'unknown')}${p.is_admin?' <span class="pc-admin">ADMIN</span>':''}</div>
+    </div>`).join('');
+  grid.querySelectorAll('.profile-card').forEach(card=>{
+    const p = list[Number(card.dataset.index)];
+    card.addEventListener('click', ()=> openProfileModal(p.id, p.username));
+  });
+}
+document.getElementById('profiles-search').addEventListener('input', renderCommunityProfiles);
+
+async function openProfileModal(userId, usernameHint){
+  const modal = document.getElementById('profile-modal');
+  document.getElementById('pm-avatar').textContent = (usernameHint||'?').slice(0,1).toUpperCase();
+  document.getElementById('pm-username').textContent = usernameHint || 'someone';
+  document.getElementById('pm-favorites').innerHTML = '<div class="empty-note">loading...</div>';
+  document.getElementById('pm-playlists').innerHTML = '<div class="empty-note">loading...</div>';
+  document.getElementById('pm-presets').innerHTML = '<div class="empty-note">loading...</div>';
+  modal.classList.add('open');
+
+  const [favRes, plRes, presetRes] = await Promise.all([
+    sb.from('favorite_albums').select('albums(id,title,artist,artwork_url)').eq('user_id', userId),
+    sb.from('playlists').select('*, playlist_tracks(id)').eq('user_id', userId).eq('is_public', true).order('created_at', {ascending:false}),
+    sb.from('presets').select('*, albums(title), playlists(name), tracks(title)').eq('user_id', userId).order('created_at', {ascending:false})
+  ]);
+
+  const favEl = document.getElementById('pm-favorites');
+  if(favRes.error){ console.error(favRes.error); favEl.innerHTML = '<div class="empty-note">could not load favorites — check console.</div>'; }
+  else{
+    const favs = (favRes.data||[]).map(r=>r.albums).filter(Boolean);
+    favEl.innerHTML = favs.length ? favs.map(a=>`
+      <div class="profile-fav-card" data-album-id="${a.id}">
+        <img src="${escAttr(a.artwork_url||'')}" loading="lazy">
+        <div class="pfc-title" title="${escAttr(a.title)}">${esc(a.title)}</div>
+      </div>`).join('') : '<div class="empty-note">no favorite albums yet.</div>';
+    favEl.querySelectorAll('.profile-fav-card').forEach(card=>{
+      card.addEventListener('click', ()=>{ modal.classList.remove('open'); openAlbumModal(Number(card.dataset.albumId)); });
+    });
+  }
+
+  const plEl = document.getElementById('pm-playlists');
+  if(plRes.error){ console.error(plRes.error); plEl.innerHTML = '<div class="empty-note">could not load playlists — check console.</div>'; }
+  else{
+    const pls = plRes.data || [];
+    plEl.innerHTML = pls.length ? pls.map((p,i)=>`
+      <div class="playlist-item" data-index="${i}">
+        <span class="playlist-name">${esc(p.name)}</span>
+        <span class="lib-album-count">${(p.playlist_tracks&&p.playlist_tracks.length)||0}</span>
+      </div>`).join('') : '<div class="empty-note">no public playlists yet.</div>';
+    plEl.querySelectorAll('.playlist-item').forEach(item=>{
+      const p = pls[Number(item.dataset.index)];
+      item.addEventListener('click', ()=>{ modal.classList.remove('open'); openPlaylistModal(p.id, { ...p, profiles:{username:usernameHint} }); });
+    });
+  }
+
+  const psEl = document.getElementById('pm-presets');
+  if(presetRes.error){ console.error(presetRes.error); psEl.innerHTML = '<div class="empty-note">could not load presets — check console.</div>'; }
+  else{
+    const presets = presetRes.data || [];
+    psEl.innerHTML = presets.length ? presets.map((p,i)=>{
+      const target = p.albums?.title || p.playlists?.name || p.tracks?.title || 'unknown';
+      const kind = p.album_id ? 'album' : p.playlist_id ? 'playlist' : 'song';
+      return `<div class="playlist-item" data-index="${i}">
+        <span class="playlist-name">${esc(p.name)} <span style="opacity:.6;font-size:9px">— ${kind}: ${esc(target)}</span></span>
+        <span class="preset-load" data-action="load" title="load preset">▶</span>
+        <span class="preset-load" data-action="export" title="download preset as a file">⬇</span>
+      </div>`;
+    }).join('') : '<div class="empty-note">no presets published yet.</div>';
+    psEl.querySelectorAll('.playlist-item').forEach(item=>{
+      const p = presets[Number(item.dataset.index)];
+      item.addEventListener('click', e=>{
+        const action = e.target.dataset.action;
+        if(action==='export'){ e.stopPropagation(); downloadPresetFile(p.name, p.settings, p.poly_model); return; }
+        applyVizSettings(p.settings);
+        if(p.poly_model && p.poly_model.downloadUrl){ currentPolyModel = p.poly_model; loadModelFromUrl(p.poly_model.downloadUrl, p.poly_model.title); }
+      });
+    });
+  }
+}
+document.getElementById('pm-close').addEventListener('click', ()=> document.getElementById('profile-modal').classList.remove('open'));
+document.getElementById('profile-modal').addEventListener('click', e=>{ if(e.target.id === 'profile-modal') e.currentTarget.classList.remove('open'); });
 
 // ═══════════════════════════════════════════════════════════
 //  INIT
