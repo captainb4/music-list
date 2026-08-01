@@ -68,6 +68,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 .toggle{position:relative;width:32px;height:18px}.toggle input{display:none}
 .ttrack{position:absolute;inset:0;background:var(--border);cursor:pointer;transition:background .2s}
 .toggle input:checked+.ttrack{background:var(--accent)}
+.toggle input:checked+.ttrack.tt-accent3{background:var(--accent3)}
 .ttrack::after{content:'';position:absolute;width:10px;height:10px;background:var(--bg);top:4px;left:4px;transition:transform .15s}
 .toggle input:checked+.ttrack::after{transform:translateX(14px)}
 .color-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
@@ -528,7 +529,7 @@ header{flex:0 0 auto}
               <div class="model-info" id="model-info"></div>
               <button id="remove-model-btn" class="px-btn" style="display:none;width:100%;margin-top:6px;border-color:var(--accent2);color:var(--accent2)">✕ Remove Model</button>
               <div id="model-ctrl">
-                <div class="toggle-row" style="margin-top:10px"><span class="ctrl-label">Show Model</span><label class="toggle"><input type="checkbox" id="show-model" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
+                <div class="toggle-row" style="margin-top:10px"><span class="ctrl-label">Show Model</span><label class="toggle"><input type="checkbox" id="show-model" checked><div class="ttrack tt-accent3"></div></label></div>
                 <div class="toggle-row"><span class="ctrl-label">Wireframe</span><label class="toggle"><input type="checkbox" id="model-wire"><div class="ttrack"></div></label></div>
                 <div class="control"><div class="ctrl-row"><span class="ctrl-label">Distortion</span><span class="ctrl-val" id="val-distort" style="color:var(--accent3)">0.50</span></div><input type="range" id="distort-amt" min="0" max="3" value="0.5" step="0.05"></div>
                 <div class="control"><div class="ctrl-row"><span class="ctrl-label">Model Scale</span><span class="ctrl-val" id="val-mscale" style="color:var(--accent3)">1.0</span></div><input type="range" id="model-size" min="0.2" max="5" value="1.0" step="0.1"></div>
@@ -539,12 +540,12 @@ header{flex:0 0 auto}
                      not stuck bouncing to another tab to adjust rotation,
                      glow, floor, or background while looking at a model. -->
                 <div style="margin:14px 0 8px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;letter-spacing:1px;color:var(--muted)">CAMERA / RENDER</div>
-                <div class="toggle-row"><span class="ctrl-label">Auto-Rotate</span><label class="toggle"><input type="checkbox" id="model-auto-rot" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
-                <div class="toggle-row"><span class="ctrl-label">Beat Pulse</span><label class="toggle"><input type="checkbox" id="model-beat-pulse" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
-                <div class="toggle-row"><span class="ctrl-label">Glow Effect</span><label class="toggle"><input type="checkbox" id="model-use-glow" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
+                <div class="toggle-row"><span class="ctrl-label">Auto-Rotate</span><label class="toggle"><input type="checkbox" id="model-auto-rot" checked><div class="ttrack tt-accent3"></div></label></div>
+                <div class="toggle-row"><span class="ctrl-label">Beat Pulse</span><label class="toggle"><input type="checkbox" id="model-beat-pulse" checked><div class="ttrack tt-accent3"></div></label></div>
+                <div class="toggle-row"><span class="ctrl-label">Glow Effect</span><label class="toggle"><input type="checkbox" id="model-use-glow" checked><div class="ttrack tt-accent3"></div></label></div>
                 <div class="control"><div class="ctrl-row"><span class="ctrl-label">Glow Level</span><span class="ctrl-val" id="val-model-glow" style="color:var(--accent3)">0.28</span></div><input type="range" id="model-glow-level" min="0.02" max="0.8" value="0.28" step="0.02"></div>
-                <div class="toggle-row"><span class="ctrl-label">Show Floor</span><label class="toggle"><input type="checkbox" id="model-show-floor" checked><div class="ttrack" style="background:var(--accent3)"></div></label></div>
-                <div class="toggle-row"><span class="ctrl-label">Rainbow BG</span><label class="toggle"><input type="checkbox" id="model-rainbow-bg"><div class="ttrack" style="background:var(--accent3)"></div></label></div>
+                <div class="toggle-row"><span class="ctrl-label">Show Floor</span><label class="toggle"><input type="checkbox" id="model-show-floor"><div class="ttrack tt-accent3"></div></label></div>
+                <div class="toggle-row"><span class="ctrl-label">Rainbow BG</span><label class="toggle"><input type="checkbox" id="model-rainbow-bg"><div class="ttrack tt-accent3"></div></label></div>
                 <div class="control" style="margin-top:8px"><div class="ctrl-row"><span class="ctrl-label">Rotation Speed</span><span class="ctrl-val" id="val-model-rotspd" style="color:var(--accent3)">0.3</span></div><input type="range" id="model-rot-spd" min="0" max="2" value="0.3" step="0.05"></div>
                 <div class="color-row"><span class="ctrl-label">Background</span><input type="color" id="model-col-bg" value="#0d0f0b"></div>
               </div>
