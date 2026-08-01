@@ -1899,9 +1899,30 @@ function initThree(){
   threeLoop();
 }
 
+// Orbits the 3D model camera using the exact same rotX/rotY/zoom/pan state
+// the voxel canvas's mouse controls already maintain (see the mousedown/
+// mousemove/wheel listeners near the bottom of the file) — so drag-to-
+// rotate, scroll-to-zoom, and right-drag-to-pan work identically whether
+// you're looking at the voxels or a loaded 3D model, with no separate
+// control scheme to learn.
+const THREE_CAM_BASE_DIST = 1.8; // matches the camera's original fixed z=4 at the default zoom of .45
+function updateThreeCamera(){
+  if(!threeC)return;
+  const dist = THREE_CAM_BASE_DIST / Math.max(.05, view.zoom);
+  const elev = Math.max(-1.5, Math.min(1.5, view.rotX)); // clamp so it can't flip over the poles
+  const azim = view.rotY;
+  const x = dist * Math.sin(azim) * Math.cos(elev);
+  const y = dist * Math.sin(elev);
+  const z = dist * Math.cos(azim) * Math.cos(elev);
+  const tx = -view.panX * 0.003, ty = view.panY * 0.003; // small screen-drag → world-space pan
+  threeC.position.set(tx + x, ty + y, z);
+  threeC.lookAt(tx, ty, 0);
+}
 function threeLoop(){
   requestAnimationFrame(threeLoop);
-  if(!threeR||!modelRoot||!document.getElementById('show-model').checked){if(threeR)threeR.render(threeS,threeC);return;}
+  if(!threeR)return;
+  updateThreeCamera();
+  if(!modelRoot||!document.getElementById('show-model').checked){threeR.render(threeS,threeC);return;}
   const bs=hasAudio()?band(0,.15):0,md=hasAudio()?band(.15,.5):0,tr=hasAudio()?band(.5,1):0;
   const rotSpd=+document.getElementById('rot-spd').value;
   mRotY+=(0.005+bs*.012+md*.006)*(rotSpd*.5+.5);
