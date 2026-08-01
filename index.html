@@ -1100,6 +1100,17 @@ async function searchYouTubeAlbums(term){
       thumbnail: (it.snippet.thumbnails && (it.snippet.thumbnails.high || it.snippet.thumbnails.medium || it.snippet.thumbnails.default) || {}).url || ''
     }));
 }
+// Playlist titles are usually "Artist - Album Name" — split that out so the
+// artist field shows the band, not whichever channel uploaded it, and strip
+// the band name off the front of the album title.
+function parseYouTubeAlbumTitle(rawTitle, channelTitle){
+  const title = String(rawTitle || '').trim();
+  const m = title.match(/^(.{1,60}?)\s*[-–—:]\s+(.+)$/);
+  if(m && m[1].trim() && m[2].trim()){
+    return { artist: m[1].trim(), title: m[2].trim() };
+  }
+  return { artist: (channelTitle || '').trim(), title };
+}
 // ---- YouTube playlist → tracklist (with per-video durations) ----
 function iso8601DurationToMs(dur){
   const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(dur || '');
@@ -1360,8 +1371,9 @@ async function importLibAlbum(result, btnEl){
   try{
     const trks = await fetchYouTubePlaylistTracks(result.playlistId);
     if(!trks.length){ statusEl.textContent = 'could not load tracks for that playlist — try another.'; if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'ADD'; } return; }
+    const parsed = parseYouTubeAlbumTitle(result.title, result.channelTitle);
     const albumRow = {
-      youtube_playlist_id: result.playlistId, title: result.title, artist: result.channelTitle,
+      youtube_playlist_id: result.playlistId, title: parsed.title, artist: parsed.artist,
       artwork_url: result.thumbnail, track_count: trks.length, added_by: libCurrentUser.id
     };
     const { data: inserted, error } = await sb.from('albums').insert(albumRow).select().single();
@@ -1374,7 +1386,7 @@ async function importLibAlbum(result, btnEl){
       const { error: trackErr } = await sb.from('tracks').insert(trackRows);
       if(trackErr) console.error(trackErr);
     }
-    statusEl.textContent = `added "${result.title}" with ${trackRows.length} tracks from YouTube.`;
+    statusEl.textContent = `added "${parsed.title}" with ${trackRows.length} tracks from YouTube.`;
     if(btnEl){ btnEl.textContent = 'ADDED ✓'; }
     await loadLibAlbums();
   }catch(e){
