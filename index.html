@@ -2016,18 +2016,17 @@ function loadModel(file){
 }
 // Same pipeline as loadModel(), but for a model fetched by URL (used by the
 // Poly Pizza search results) instead of a local File.
-function loadModelFromUrl(url,label,ext){
+function loadModelFromUrl(url,label,ext,onFail){
   if(!threeR)initThree();
   ext=(ext||url.split('?')[0].split('.').pop()||'').toLowerCase();
   const statusEl=document.getElementById('poly-search-status');
+  const fail=()=>{ if(onFail){ onFail(); } else if(statusEl){ statusEl.textContent='could not load that model (its host may not allow direct downloads from a browser). try another.'; } };
   if(ext==='glb'||ext==='gltf'){
     if(!THREE.GLTFLoader){alert('GLTFLoader not available. Check internet connection.');return;}
-    new THREE.GLTFLoader().load(url,g=>{onModelLoaded(g.scene,label);if(statusEl)statusEl.textContent=`loaded "${label}".`;},null,
-      ()=>{ if(statusEl) statusEl.textContent='could not load that model (its host may not allow direct downloads from a browser). try another.'; });
+    new THREE.GLTFLoader().load(url,g=>{onModelLoaded(g.scene,label);if(statusEl)statusEl.textContent=`loaded "${label}".`;},null,fail);
   }else if(ext==='obj'){
     if(!THREE.OBJLoader){alert('OBJLoader not available. Check internet connection.');return;}
-    new THREE.OBJLoader().load(url,o=>{onModelLoaded(o,label);if(statusEl)statusEl.textContent=`loaded "${label}".`;},null,
-      ()=>{ if(statusEl) statusEl.textContent='could not load that model (its host may not allow direct downloads from a browser). try another.'; });
+    new THREE.OBJLoader().load(url,o=>{onModelLoaded(o,label);if(statusEl)statusEl.textContent=`loaded "${label}".`;},null,fail);
   }else{
     if(statusEl) statusEl.textContent=`unsupported file type "${ext}" for that model.`;
   }
@@ -2101,7 +2100,14 @@ function renderPolyResults(list){
       statusEl.textContent=`loading "${m.title}"...`;
       currentPolyModel = m;
       updatePolyCredit();
-      loadModelFromUrl(m.downloadUrl, m.title);
+      loadModelFromUrl(m.downloadUrl, m.title, null, ()=>{
+        // Host doesn't allow direct browser downloads — drop it from the
+        // results list rather than leaving a dead entry behind.
+        item.remove();
+        currentPolyModel = null;
+        updatePolyCredit();
+        statusEl.textContent = `"${m.title}" can't be loaded directly from the browser — removed it from the list. try another.`;
+      });
     });
   });
 }
