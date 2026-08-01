@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VoxelBeat — Automated Button/Function Test</title>
+<style>
+  body{background:#0a0f0a;color:#9fe89f;font-family:'Courier New',monospace;padding:20px;margin:0;}
+  h2{color:#c8ffc8;margin-top:0;}
+  p{color:#7ac97a;max-width:800px;line-height:1.5;}
+  #controls{margin:16px 0;display:flex;gap:10px;align-items:center;}
+  button.run{background:#163a16;color:#afffaf;border:1px solid #4a4;padding:10px 20px;cursor:pointer;font-family:inherit;font-size:14px;border-radius:4px;}
+  button.run:hover{background:#1e4d1e;}
+  button.run:disabled{opacity:.5;cursor:default;}
+  #summary{font-size:15px;margin-left:8px;}
+  #report{white-space:pre-wrap;background:#0e140e;border:1px solid #2a4a2a;padding:14px;margin-top:12px;max-height:50vh;overflow:auto;font-size:13px;border-radius:4px;}
+  #report div{padding:1px 0;}
+  .fail{color:#ff6b6b;}
+  .pass{color:#5fd75f;opacity:.7;}
+  .info{color:#ffd166;}
+  .section{color:#6bd6ff;margin-top:10px;font-weight:bold;}
+  iframe{width:100%;height:520px;border:1px solid #2a4a2a;background:#000;margin-top:14px;border-radius:4px;}
+  .note{color:#e0a030;font-size:13px;}
+</style>
+</head>
+<body>
+  <h2>VoxelBeat — Automated Button / Function Test</h2>
+  <p>
+    Loads <code>index.html</code> in the iframe below, then programmatically clicks every
+    button, toggles every checkbox/slider, and cycles every dropdown — while capturing any
+    JS errors, unhandled promise rejections, or <code>console.error</code> calls that result.
+  </p>
+  <p class="note">
+    Note: this only catches things that break immediately or throw an error. It won't catch
+    things that are "wrong but silent" (e.g. a button that runs without error but does the
+    wrong thing), and some controls (audio uploads, YouTube search results, Supabase-backed
+    playlists) need real network/user data to fully exercise — watch the iframe itself while
+    the test runs too. Best run from the actual deployed GitHub Pages URL, not a local file,
+    so the iframe isn't blocked by same-origin restrictions.
+  </p>
+  <div id="controls">
+    <button class="run" id="run">▶ Run Test</button>
+    <span id="summary"></span>
+  </div>
+  <div id="report">Click "Run Test" to begin…</div>
+  <iframe id="app" src="about:blank"></iframe>
+
+<script>
+const reportEl = document.getElementById('report');
+const summaryEl = document.getElementById('summary');
+const runBtn = document.getElementById('run');
+
+function log(msg, cls){
+  const d = document.createElement('div');
+  if(cls) d.className = cls;
+  d.textContent = msg;
+  reportEl.appendChild(d);
+  reportEl.scrollTop = reportEl.scrollHeight;
+}
+function section(msg){ log(msg, 'section'); }
+function wait(ms){ return new Promise(r=>setTimeout(r, ms)); }
+
+async function runTest(){
+  runBtn.disabled = true;
+  reportEl.innerHTML = '';
+  summaryEl.textContent = '';
+  const errors = [];
+  const iframe = document.getElementById('app');
+
+  section('Loading index.html…');
+  try{
+    await new Promise((resolve, reject)=>{
+      const t = setTimeout(()=>reject(new Error('iframe never fired onload after 15s')), 15000);
+      iframe.onload = ()=>{ clearTimeout(t); resolve(); };
+      iframe.src = 'index.html?_selftest=' + Date.now();
+    });
+  }catch(e){
+    log('FATAL: could not load index.html in iframe — ' + e.message, 'fail');
+    log('(If you opened this file directly from disk, browsers often block cross-frame access on file:// URLs. Try hosting both files — e.g. your GitHub Pages URL — and open selftest.html from there instead.)', 'note');
+    runBtn.disabled = false;
+    return;
+  }
+
+  await wait(1500); // let the app's own init/boot logic settle
+
+  let win, doc;
+  try{
+    win = iframe.contentWindow;
+    doc = iframe.contentDocument;
+    if(!doc) throw new Error('contentDocument is null (likely a cross-origin restriction)');
+  }catch(e){
+    log('FATAL: cannot access iframe contents — ' + e.message, 'fail');
+    log('This usually means the page is being viewed from a different origin than index.html. Serve both files from the same host.', 'note');
+    runBtn.disabled = false;
+    return;
+  }
+
+  // Capture errors going forward
+  win.addEventListener('error', e=>{
+    errors.push({type:'error', msg:e.message + (e.filename ? ' @ ' + e.filename.split('/').pop() + ':' + e.lineno : ''), ts:Date.now()});
+  });
+  win.addEventListener('unhandledrejection', e=>{
+    errors.push({type:'promise', msg:String(e.reason && e.reason.message || e.reason), ts:Date.now()});
+  });
+  const origErr = win.console.error.bind(win.console);
+  win.console.error = (...args)=>{
+    errors.push({type:'console.error', msg:args.map(a=>{try{return typeof a==='string'?a:JSON.stringify(a);}catch(_){return String(a);}}).join(' '), ts:Date.now()});
+    origErr(...args);
+  };
+
+  async function exercise(el, label, action){
+    const before = errors.length;
+    try{
+      await action();
+    }catch(e){
+      errors.push({type:'thrown', msg:e.message, ts:Date.now()});
+    }
+    await wait(150); // let synchronous handlers + immediate microtasks/timeouts settle
+    const newErrs = errors.slice(before);
+    if(newErrs.length){
+      log(`FAIL  [${label}]  →  ${newErrs.map(x=>`(${x.type}) ${x.msg}`).join('  |  ')}`, 'fail');
+    } else {
+      log(`ok    [${label}]`, 'pass');
+    }
+    return newErrs.length === 0;
+  }
+
+  let passCount = 0, failCount = 0;
+
+  // ---- Buttons ----
+  section('--- Buttons ---');
+  const buttons = [...doc.querySelectorAll('button')];
+  log(`Found ${buttons.length} <button> elements.`);
+  for(const el of buttons){
+    const label = el.id || (el.textContent||'').trim().slice(0,40) || el.className || '(unlabeled button)';
+    const ok = await exercise(el, label, ()=>{ el.dispatchEvent(new win.MouseEvent('click', {bubbles:true, cancelable:true})); });
+    ok ? passCount++ : failCount++;
+  }
+
+  // ---- Checkboxes ----
+  section('--- Checkboxes ---');
+  const checks = [...doc.querySelectorAll('input[type=checkbox]')];
+  log(`Found ${checks.length} checkboxes.`);
+  for(const el of checks){
+    const label = 'checkbox:' + (el.id || el.name || '(unlabeled)');
+    const ok = await exercise(el, label, ()=>{
+      el.checked = !el.checked;
+      el.dispatchEvent(new win.Event('change', {bubbles:true}));
+    });
+    ok ? passCount++ : failCount++;
+  }
+
+  // ---- Range / number sliders ----
+  section('--- Sliders / number inputs ---');
+  const ranges = [...doc.querySelectorAll('input[type=range], input[type=number]')];
+  log(`Found ${ranges.length} range/number inputs.`);
+  for(const el of ranges){
+    const label = 'input:' + (el.id || el.name || '(unlabeled)');
+    const original = el.value;
+    const ok = await exercise(el, label, ()=>{
+      el.value = el.max !== '' ? el.max : (Number(original)+1);
+      el.dispatchEvent(new win.Event('input', {bubbles:true}));
+      el.dispatchEvent(new win.Event('change', {bubbles:true}));
+    });
+    ok ? passCount++ : failCount++;
+  }
+
+  // ---- Dropdowns ----
+  section('--- Dropdowns ---');
+  const selects = [...doc.querySelectorAll('select')];
+  log(`Found ${selects.length} <select> elements.`);
+  for(const el of selects){
+    const label = 'select:' + (el.id || el.name || '(unlabeled)');
+    let allOk = true;
+    for(const opt of [...el.options]){
+      const ok = await exercise(el, `${label} = "${opt.value}"`, ()=>{
+        el.value = opt.value;
+        el.dispatchEvent(new win.Event('change', {bubbles:true}));
+      });
+      if(!ok) allOk = false;
+    }
+    allOk ? passCount++ : failCount++;
+  }
+
+  // ---- Text inputs (just focus/blur/type a char, don't submit anything) ----
+  section('--- Text inputs (focus/type/blur only) ---');
+  const texts = [...doc.querySelectorAll('input[type=text], input[type=search], input:not([type])')];
+  log(`Found ${texts.length} text-like inputs.`);
+  for(const el of texts){
+    const label = 'text:' + (el.id || el.name || '(unlabeled)');
+    const ok = await exercise(el, label, ()=>{
+      el.focus();
+      el.value = 'test';
+      el.dispatchEvent(new win.Event('input', {bubbles:true}));
+      el.blur();
+    });
+    ok ? passCount++ : failCount++;
+  }
+
+  section('--- Done ---');
+  log(`${passCount} passed, ${failCount} flagged, ${errors.length} total error event(s) captured.`);
+  if(failCount === 0){
+    summaryEl.innerHTML = `<span class="pass">✓ No errors caught across ${passCount} interactions</span>`;
+  } else {
+    summaryEl.innerHTML = `<span class="fail">✗ ${failCount} control(s) threw errors</span> — see report above`;
+  }
+
+  runBtn.disabled = false;
+}
+
+runBtn.addEventListener('click', ()=>runTest().catch(e=>{
+  log('Test harness itself crashed: ' + e.message, 'fail');
+  runBtn.disabled = false;
+}));
+</script>
+</body>
+</html>
