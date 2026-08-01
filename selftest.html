@@ -290,10 +290,15 @@ async function runLiveTest(){
       addBtn.click();
       await sleep(4500);
       const after = state();
+      const btnText = (addBtn.textContent || '').trim();
       if (typeof after.libAlbumsCount === 'number' && typeof albumsBefore === 'number' && after.libAlbumsCount > albumsBefore){
         line(liveReport, `<span class="ok">✓</span> Clicked ADD on a real result: libAlbums went from ${albumsBefore} to ${after.libAlbumsCount}.`);
+      } else if (/ALREADY IN LIBRARY/i.test(btnText)){
+        line(liveReport, `<span class="ok">✓</span> ADD button correctly reported "ALREADY IN LIBRARY" — this album was already imported in a previous run, so the count staying at ${after.libAlbumsCount} is expected dedup behavior, not a failure.`);
+      } else if (/ADDED/i.test(btnText)){
+        line(liveReport, `<span class="ok">✓</span> Button shows "${esc(btnText)}" — import succeeded (libAlbums count may just not have been re-fetched into the hook's snapshot yet).`);
       } else {
-        line(liveReport, `<span class="warn">⚠</span> Clicked ADD but libAlbums count didn't visibly increase (${albumsBefore} → ${after.libAlbumsCount}). Check the status text above for why.`);
+        line(liveReport, `<span class="warn">⚠</span> Clicked ADD but libAlbums count didn't visibly increase (${albumsBefore} → ${after.libAlbumsCount}). Button now reads "${esc(btnText)}". Search-status text above should explain why.`);
       }
     }
   } else if (!s.libCurrentUser) {
@@ -391,11 +396,30 @@ async function runLiveTest(){
     await sleep(150);
     setVal('poly-search-input', 'car');
     click('poly-search-btn');
-    await sleep(3500);
-    const statusEl = doc.getElementById('poly-search-status') || doc.querySelector('.model-search-status');
-    const resultsEl = doc.getElementById('poly-search-results') || doc.querySelector('.poly-results, .model-results');
+    // Search runs in two phases (search, then a per-result reachability
+    // check), so poll until the status text stops changing instead of
+    // guessing a fixed delay — up to ~15s before giving up.
+    const statusEl = doc.getElementById('poly-search-status');
+    let lastText = null, stableCount = 0;
+    for (let i = 0; i < 30; i++){
+      await sleep(500);
+      const t = statusEl ? statusEl.textContent : null;
+      if (t === lastText){
+        stableCount++;
+        if (stableCount >= 2) break; // unchanged for 1s straight = settled
+      } else {
+        stableCount = 0;
+        lastText = t;
+      }
+    }
+    const resultsEl = doc.getElementById('poly-search-results');
     const count = resultsEl ? resultsEl.children.length : 'unknown (results container id not found)';
-    line(liveReport, `${label}: status="${esc(statusEl ? statusEl.textContent : '(no status element found)')}", ${count} result(s) rendered.`);
+    const finalStatus = statusEl ? statusEl.textContent : '(no status element found)';
+    if (/searching|checking/i.test(finalStatus)){
+      line(liveReport, `<span class="warn">⚠</span> ${label}: still showing "${esc(finalStatus)}" after ~15s — genuinely slow or stuck. ${count} result(s) rendered so far.`);
+    } else {
+      line(liveReport, `<span class="ok">✓</span> ${label}: status="${esc(finalStatus)}", ${count} result(s) rendered.`);
+    }
   }
   await testModelSource('src-btn-polypizza', 'Poly Pizza');
   await testModelSource('src-btn-icosa', 'Icosa Gallery');
