@@ -2848,14 +2848,17 @@ document.getElementById('cloud-preset-save-btn').addEventListener('click', async
   if(!ctx){ statusEl.textContent='open an album/playlist, or play a song, first.'; return; }
   const name=nameEl.value.trim();
   if(!name){ statusEl.textContent='give your preset a name.'; return; }
+  const targetId = ctx.type==='album' ? ctx.id : ctx.type==='playlist' ? ctx.id : ctx.type==='track' ? ctx.id : null;
+  if(targetId==null){ statusEl.textContent = `could not determine the current ${ctx.type} — try reopening it and playing again.`; console.error('publish preset: ctx had no usable id', ctx); return; }
   const row = {
     user_id: libCurrentUser.id, name,
-    album_id: ctx.type==='album' ? ctx.id : null,
-    playlist_id: ctx.type==='playlist' ? ctx.id : null,
-    track_id: ctx.type==='track' ? ctx.id : null,
+    album_id: ctx.type==='album' ? targetId : null,
+    playlist_id: ctx.type==='playlist' ? targetId : null,
+    track_id: ctx.type==='track' ? targetId : null,
     settings: collectVizSettings(),
     poly_model: currentPolyModel || null
   };
+  console.log('publishing preset row:', row);
   const { error } = await sb.from('presets').insert(row);
   if(error){ console.error(error); statusEl.textContent = 'could not publish — ' + (error.message || 'check console.'); return; }
   statusEl.textContent=`published "${name}".`; nameEl.value='';
