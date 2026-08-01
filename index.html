@@ -164,7 +164,11 @@ input[type=color]::-webkit-color-swatch-wrapper{padding:0}input[type=color]::-we
 .modal-art{width:110px;height:110px;border-radius:2px;object-fit:cover;flex-shrink:0;background:var(--surface2)}
 .modal-info{display:flex;flex-direction:column;gap:6px;justify-content:center;min-width:0}
 .modal-title{font-family:'VT323',monospace;font-size:22px;color:var(--accent);letter-spacing:1px;line-height:1.1}
+.modal-artist-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .modal-artist{font-size:12px;color:var(--text)}
+.modal-release-date{font-size:10px;color:var(--muted);border-bottom:1px dashed var(--border);line-height:1.4;transition:all .1s}
+.modal-release-date.editable{cursor:pointer}
+.modal-release-date.editable:hover{color:var(--accent);border-bottom-color:var(--accent)}
 .modal-tags{display:flex;gap:6px;margin-top:2px;flex-wrap:wrap}
 .tag{font-size:8px;letter-spacing:.5px;color:var(--muted);border:1px solid var(--border);padding:1px 5px;border-radius:2px}
 .modal-actions{display:flex;gap:8px;margin-top:6px}
@@ -608,7 +612,10 @@ header{flex:0 0 auto}
       <img class="modal-art" id="modal-art" src="">
       <div class="modal-info">
         <div class="modal-title" id="modal-title"></div>
-        <div class="modal-artist" id="modal-artist"></div>
+        <div class="modal-artist-row">
+          <span class="modal-artist" id="modal-artist"></span>
+          <span class="modal-release-date" id="modal-release-date" title="Click to edit release date"></span>
+        </div>
         <div class="modal-tags" id="modal-tags"></div>
         <div class="modal-actions">
           <button class="lib-btn" id="modal-play-all" style="width:auto;padding:6px 12px;margin-top:0">▶ PLAY ALL</button>
@@ -1123,6 +1130,45 @@ function parseYouTubeAlbumTitle(rawTitle, channelTitle){
   }
   return { artist: (channelTitle || '').trim(), title: cleanAlbumTitle(title) || title };
 }
+// Coerce a release date into YYYY-MM-DD (or null) — accepts a bare year,
+// "YYYY-MM", or a full date, since that's what MusicBrainz and manual entry
+// both hand back.
+function normalizeReleaseDate(v){
+  if(!v) return null;
+  const s = String(v).trim();
+  if(/^\d{4}$/.test(s)) return s + '-01-01';
+  if(/^\d{4}-\d{2}$/.test(s)) return s + '-01';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  return null;
+}
+function formatReleaseDateShort(v){
+  if(!v) return '';
+  const d = new Date(v + 'T00:00:00');
+  if(isNaN(d)) return '';
+  return String(d.getFullYear());
+}
+// Look up the canonical artist/album title + first release date from
+// MusicBrainz's open, keyless catalog — used to clean up whatever came off
+// the YouTube playlist title. Fails silently (returns null) so an import
+// never blocks on it.
+async function lookupMusicBrainzRelease(artist, title){
+  if(!artist && !title) return null;
+  try{
+    const q = `artist:"${(artist||'').replace(/"/g,'')}" AND release:"${(title||'').replace(/"/g,'')}"`;
+    const url = `https://musicbrainz.org/ws/2/release-group/?query=${encodeURIComponent(q)}&fmt=json&limit=1`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if(!res.ok) return null;
+    const data = await res.json();
+    const rg = data && data['release-groups'] && data['release-groups'][0];
+    if(!rg) return null;
+    const creditedArtist = rg['artist-credit'] && rg['artist-credit'][0] && rg['artist-credit'][0].name;
+    return {
+      artist: creditedArtist || null,
+      title: rg.title || null,
+      release_date: normalizeReleaseDate(rg['first-release-date'])
+    };
+  }catch(e){ console.error('MusicBrainz lookup failed', e); return null; }
+}
 // ---- YouTube playlist → tracklist (with per-video durations) ----
 function iso8601DurationToMs(dur){
   const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(dur || '');
@@ -1284,14 +1330,19 @@ function openAlbumModal(albumId){
   libActiveAlbumId = albumId; renderLibAlbumList();
   currentPlayContext = {type:'album', id:album.id, name:album.title};
   loadContextPresets();
+  const canManage = !!(libCurrentUser && (album.added_by === libCurrentUser.id || libIsAdmin));
   document.getElementById('modal-art').src = album.artwork_url || '';
   document.getElementById('modal-title').textContent = album.title;
   document.getElementById('modal-artist').textContent = album.artist;
+  const rdEl = document.getElementById('modal-release-date');
+  const rdText = formatReleaseDateShort(album.release_date);
+  rdEl.textContent = rdText || (canManage ? '+ add date' : '');
+  rdEl.style.display = (rdText || canManage) ? 'inline-block' : 'none';
+  rdEl.classList.toggle('editable', canManage);
+  rdEl.onclick = canManage ? (()=> editAlbumReleaseDate(album.id)) : null;
   document.getElementById('modal-tags').innerHTML = `
     ${album.genre?`<span class="tag">${esc(album.genre)}</span>`:''}
-    ${album.release_date?`<span class="tag">${new Date(album.release_date).getFullYear()}</span>`:''}
     <span class="tag">${album.tracks.length} tracks</span>`;
-  const canManage = !!(libCurrentUser && (album.added_by === libCurrentUser.id || libIsAdmin));
   const delBtn = document.getElementById('modal-delete');
   delBtn.style.display = canManage ? 'inline-block' : 'none';
   delBtn.textContent = 'DELETE ALBUM';
@@ -1325,6 +1376,25 @@ async function editLibAlbum(albumId){
   if(artwork_url === null) return;
   const { error } = await sb.from('albums').update({ title: title.trim(), artist: artist.trim(), artwork_url: artwork_url.trim() }).eq('id', albumId);
   if(error){ console.error(error); alert('could not save changes — check console.'); return; }
+  await loadLibAlbums();
+  openAlbumModal(albumId);
+}
+async function editAlbumReleaseDate(albumId){
+  const album = libAlbums.find(a=>a.id===albumId);
+  if(!album) return;
+  const canManage = !!(libCurrentUser && (album.added_by === libCurrentUser.id || libIsAdmin));
+  if(!canManage) return;
+  const current = album.release_date ? album.release_date.slice(0,10) : '';
+  const input = prompt('Release date — YYYY, YYYY-MM, or YYYY-MM-DD:', current);
+  if(input === null) return;
+  const trimmed = input.trim();
+  if(trimmed && !normalizeReleaseDate(trimmed)){
+    alert('Could not read that date — try YYYY, YYYY-MM, or YYYY-MM-DD.');
+    return;
+  }
+  const release_date = trimmed ? normalizeReleaseDate(trimmed) : null;
+  const { error } = await sb.from('albums').update({ release_date }).eq('id', albumId);
+  if(error){ console.error(error); alert('could not save release date — check console.'); return; }
   await loadLibAlbums();
   openAlbumModal(albumId);
 }
@@ -1384,9 +1454,13 @@ async function importLibAlbum(result, btnEl){
     const trks = await fetchYouTubePlaylistTracks(result.playlistId);
     if(!trks.length){ statusEl.textContent = 'could not load tracks for that playlist — try another.'; if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'ADD'; } return; }
     const parsed = parseYouTubeAlbumTitle(result.title, result.channelTitle);
+    const mb = await lookupMusicBrainzRelease(parsed.artist, parsed.title);
+    if(mb && mb.artist) parsed.artist = mb.artist;
+    if(mb && mb.title) parsed.title = mb.title;
     const albumRow = {
       youtube_playlist_id: result.playlistId, title: parsed.title, artist: parsed.artist,
-      artwork_url: result.thumbnail, track_count: trks.length, added_by: libCurrentUser.id
+      artwork_url: result.thumbnail, track_count: trks.length, added_by: libCurrentUser.id,
+      release_date: (mb && mb.release_date) || null
     };
     const { data: inserted, error } = await sb.from('albums').insert(albumRow).select().single();
     if(error){ console.error(error); statusEl.textContent = 'could not save album — check console.'; if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'ADD'; } return; }
