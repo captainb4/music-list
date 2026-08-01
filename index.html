@@ -336,6 +336,24 @@ header{flex:0 0 auto}
             <div id="album-search-results"></div>
           </div>
         </div>
+        <div class="panel" id="pl-import-panel" style="display:none;margin-top:16px">
+          <div class="lib-field">
+            <span class="lib-label">OR IMPORT FROM A YOUTUBE PLAYLIST</span>
+            <div class="yt-url-row">
+              <input type="text" id="pl-import-input" class="yt-url-input" placeholder="Paste a YouTube playlist URL...">
+              <button class="yt-add-btn" id="pl-import-btn" style="color:var(--accent)">FIND ALBUMS</button>
+            </div>
+          </div>
+          <div class="lib-status" id="pl-import-status" style="margin-top:0">looks up which album each song in the playlist is from, so you can pick which ones to add.</div>
+          <div id="pl-import-progress-wrap" style="display:none;margin-top:8px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+              <span class="lib-label" style="margin-bottom:0">SEARCHING PLAYLIST</span>
+              <span class="lib-label" id="pl-import-progress-pct" style="margin-bottom:0;color:var(--accent)">0%</span>
+            </div>
+            <div class="progress-wrap" style="cursor:default"><div class="progress-fill" id="pl-import-progress-fill"></div></div>
+          </div>
+          <div id="pl-import-results"></div>
+        </div>
       </section>
 
       <!-- PLAYLISTS -->
@@ -1475,9 +1493,9 @@ async function doAlbumSearch(){
     statusEl.textContent = 'search failed — check your connection and try again.';
   }
 }
-async function importLibAlbum(result, btnEl){
+async function importLibAlbum(result, btnEl, statusEl){
+  statusEl = statusEl || document.getElementById('album-search-status');
   if(!libCurrentUser){
-    const statusEl = document.getElementById('album-search-status');
     if(statusEl) statusEl.textContent = 'sign in first (Account tab) to add albums to the library.';
     return;
   }
@@ -1485,7 +1503,6 @@ async function importLibAlbum(result, btnEl){
     if(btnEl){ btnEl.textContent = 'ALREADY IN LIBRARY'; btnEl.disabled = true; }
     return;
   }
-  const statusEl = document.getElementById('album-search-status');
   if(btnEl){ btnEl.disabled = true; btnEl.textContent = '...'; }
   try{
     const trks = await fetchYouTubePlaylistTracks(result.playlistId);
@@ -1518,6 +1535,130 @@ async function importLibAlbum(result, btnEl){
     if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'ADD'; }
   }
 }
+// ---- playlist → albums (paste a playlist link, find which albums its songs are from) ----
+function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+
+// Crude "Artist - Title" splitter for a YouTube video title, used only to
+// seed the MusicBrainz recording search below — doesn't need to be exact,
+// just close enough for MusicBrainz's own fuzzy matching to find the song.
+function guessArtistTrack(rawTitle){
+  const t = String(rawTitle || '')
+    .replace(/[\(\[\{][^\)\]\}]*[\)\]\}]/g, ' ') // drop (Official Video), [Lyrics], etc.
+    .replace(/\b(official\s*(music\s*)?video|official\s*audio|lyric\s*video|with\s*lyrics|lyrics|audio|visualizer|hd|hq|4k)\b/gi, ' ')
+    .replace(/\s{2,}/g, ' ').trim();
+  const m = t.match(/^(.{1,60}?)\s*[-–—]\s*(.+)$/);
+  if(m && m[1].trim() && m[2].trim()) return { artist: m[1].trim(), track: m[2].trim() };
+  return { artist: '', track: t };
+}
+// Looks up which album (release-group) a single song belongs to, via
+// MusicBrainz's open, keyless recording search — no API key needed, same
+// source already used by lookupMusicBrainzRelease() above. Prefers an
+// official studio album over singles/live/compilation releases when a
+// recording has several. Fails silently (returns null) so one bad match
+// never blocks the rest of the playlist.
+async function lookupRecordingAlbum(artist, track){
+  if(!track) return null;
+  try{
+    const q = artist
+      ? `recording:"${track.replace(/"/g,'')}" AND artist:"${artist.replace(/"/g,'')}"`
+      : `recording:"${track.replace(/"/g,'')}"`;
+    const url = `https://musicbrainz.org/ws/2/recording/?query=${encodeURIComponent(q)}&fmt=json&limit=5`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if(!res.ok) return null;
+    const recs = (await res.json()).recordings || [];
+    for(const rec of recs){
+      const releases = rec.releases || [];
+      let best = releases.find(rel => rel['release-group'] && rel['release-group']['primary-type'] === 'Album' && !(rel['release-group']['secondary-types'] || []).length);
+      if(!best) best = releases.find(rel => rel['release-group'] && rel['release-group']['primary-type'] === 'Album');
+      if(best){
+        const rg = best['release-group'];
+        const creditedArtist = rec['artist-credit'] && rec['artist-credit'][0] && rec['artist-credit'][0].name;
+        return { artist: creditedArtist || artist || '', title: rg.title };
+      }
+    }
+    return null;
+  }catch(e){ return null; }
+}
+let plImportBusy = false;
+async function doPlaylistAlbumImport(){
+  if(plImportBusy) return;
+  const raw = document.getElementById('pl-import-input').value.trim();
+  const statusEl = document.getElementById('pl-import-status');
+  const resultsEl = document.getElementById('pl-import-results');
+  const btn = document.getElementById('pl-import-btn');
+  if(!raw){ statusEl.textContent = 'paste a playlist link first.'; return; }
+  const { pid } = parseYT(raw);
+  if(!pid){ statusEl.textContent = "that doesn't look like a playlist link — needs a \"list=...\" URL."; return; }
+  if(!YT_SEARCH_CONFIGURED){ statusEl.textContent = 'YouTube search backend not connected — see README.md.'; return; }
+  plImportBusy = true;
+  resultsEl.innerHTML = '';
+  if(btn) btn.disabled = true;
+  const progWrap = document.getElementById('pl-import-progress-wrap');
+  const progFill = document.getElementById('pl-import-progress-fill');
+  const progPct = document.getElementById('pl-import-progress-pct');
+  const setProgress = pct => { if(progFill) progFill.style.width = pct + '%'; if(progPct) progPct.textContent = pct + '%'; };
+  if(progWrap) progWrap.style.display = 'block';
+  setProgress(0);
+  try{
+    statusEl.textContent = 'loading playlist...';
+    const tracks = await fetchYouTubePlaylistTracks(pid);
+    if(!tracks.length){ statusEl.textContent = 'could not load that playlist — check the link and try again.'; return; }
+    const albumsMap = new Map(); // "artist||title" (lowercase) -> {artist,title,count}
+    for(let i=0; i<tracks.length; i++){
+      statusEl.textContent = `looking up albums… (${i+1}/${tracks.length})`;
+      const { artist, track } = guessArtistTrack(tracks[i].title);
+      const found = await lookupRecordingAlbum(artist, track);
+      if(found && found.title){
+        const key = (found.artist || '').toLowerCase() + '||' + found.title.toLowerCase();
+        if(!albumsMap.has(key)) albumsMap.set(key, { artist: found.artist, title: found.title, count: 0 });
+        albumsMap.get(key).count++;
+      }
+      setProgress(Math.round(((i + 1) / tracks.length) * 100));
+      if(i < tracks.length - 1) await sleep(1100); // stay under MusicBrainz's ~1 request/sec limit
+    }
+    const albums = Array.from(albumsMap.values()).sort((a, b) => b.count - a.count);
+    if(!albums.length){ statusEl.textContent = `matched 0 albums from ${tracks.length} tracks — try Add Album search instead.`; return; }
+    statusEl.textContent = `found ${albums.length} album(s) across ${tracks.length} tracks — pick which to add:`;
+    resultsEl.innerHTML = albums.map((a, i) => `
+      <div class="sr-item" data-index="${i}">
+        <div class="sr-meta">
+          <div class="sr-title">${esc(a.title)} <span style="opacity:.6">— ${esc(a.artist || 'unknown artist')}</span></div>
+          <div class="sr-sub">${a.count} track${a.count > 1 ? 's' : ''} from this playlist</div>
+        </div>
+        <button class="sr-add" data-action="add">ADD</button>
+      </div>`).join('');
+    resultsEl.querySelectorAll('.sr-item').forEach(item => {
+      const a = albums[Number(item.dataset.index)];
+      item.querySelector('.sr-add').addEventListener('click', () => importAlbumByName(a.artist, a.title, item.querySelector('.sr-add')));
+    });
+  }catch(e){
+    console.error(e);
+    statusEl.textContent = 'could not read that playlist — check the link and try again.';
+  }finally{
+    plImportBusy = false;
+    if(btn) btn.disabled = false;
+    if(progWrap) progWrap.style.display = 'none';
+  }
+}
+document.getElementById('pl-import-btn').addEventListener('click', doPlaylistAlbumImport);
+document.getElementById('pl-import-input').addEventListener('keydown', e => { if(e.key === 'Enter') doPlaylistAlbumImport(); });
+// Finds a real full-album YouTube playlist for a resolved artist/title and
+// imports it through the exact same path as a manual "Add Album" search
+// result, so playlist-derived albums get identical tracklist/artwork handling.
+async function importAlbumByName(artist, title, btnEl){
+  const statusEl = document.getElementById('pl-import-status');
+  if(!libCurrentUser){ statusEl.textContent = 'sign in first (Account tab) to add albums to the library.'; return; }
+  if(btnEl){ btnEl.disabled = true; btnEl.textContent = '...'; }
+  try{
+    const results = await searchYouTubeAlbums([artist, title].filter(Boolean).join(' '));
+    if(!results.length){ if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'NO MATCH'; } return; }
+    await importLibAlbum(results[0], btnEl, statusEl);
+  }catch(e){
+    console.error(e);
+    if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'ADD'; }
+  }
+}
+
 async function deleteLibAlbum(albumId){
   if(!confirm('Delete this album and all its tracks? This removes it for everyone.')) return;
   const { error } = await sb.from('albums').delete().eq('id', albumId);
@@ -1657,17 +1798,18 @@ function updateLibAccountUI(){
   const loggedIn = document.getElementById('account-logged-in');
   const addLocked = document.getElementById('add-album-locked');
   const addForm = document.getElementById('add-album-form');
+  const plImportPanel = document.getElementById('pl-import-panel');
   const adminBadge = document.getElementById('account-admin-badge');
   if(libCurrentUser){
     loggedOut.style.display='none'; loggedIn.style.display='block';
     document.getElementById('account-username-display').textContent = authEmailToUsername(libCurrentUser.email);
     if(adminBadge) adminBadge.style.display = libIsAdmin ? 'inline-block' : 'none';
-    addLocked.style.display='none'; addForm.style.display='block';
+    addLocked.style.display='none'; addForm.style.display='block'; if(plImportPanel) plImportPanel.style.display='block';
   } else {
     loggedOut.style.display='block'; loggedIn.style.display='none';
     document.getElementById('account-status').textContent='';
     if(adminBadge) adminBadge.style.display='none';
-    addLocked.style.display='block'; addForm.style.display='none';
+    addLocked.style.display='block'; addForm.style.display='none'; if(plImportPanel) plImportPanel.style.display='none';
   }
 }
 async function handleLibSignUp(){
