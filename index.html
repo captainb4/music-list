@@ -1794,6 +1794,12 @@ function updateViz(){
 // ═══════════════════════════════════════════════════════════
 const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
 let view={rotX:-1.0,rotY:.6,zoom:.45,panX:0,panY:0},drag=null,lastT=0;
+// Voxel Grid's own "Auto-Rotate"/"Rotation Speed" spin ONLY the voxel
+// display — kept out of view.rotY (which the 3D model's rig reads in
+// updateThreeRig) so the Voxel Grid tab never spins the 3D model. Manual
+// drag-to-rotate still updates view.rotY/rotX directly and is shared by
+// both, since that's camera navigation rather than a per-view setting.
+let voxelAutoRotY=0;
 
 function resizeCvs(){
   const dpr=window.devicePixelRatio||1,r=canvas.parentElement.getBoundingClientRect();
@@ -1814,7 +1820,8 @@ function shade(rgb,f){return`rgb(${rgb[0]*f|0},${rgb[1]*f|0},${rgb[2]*f|0})`;}
 function renderFrame(ts){
   requestAnimationFrame(renderFrame);
   const dt=Math.min(.1,(ts-lastT)/1000);lastT=ts;frame++;
-  if(document.getElementById('auto-rot').checked)view.rotY+=dt*+document.getElementById('rot-spd').value;
+  if(document.getElementById('auto-rot').checked)voxelAutoRotY+=dt*+document.getElementById('rot-spd').value;
+  const voxRotY=view.rotY+voxelAutoRotY; // voxel-only effective Y rotation (drag + voxel auto-rotate)
   updateViz();
 
   const W=canvas.width/(window.devicePixelRatio||1),H=canvas.height/(window.devicePixelRatio||1);
@@ -1834,9 +1841,9 @@ function renderFrame(ts){
   // Half-edge vectors for a unit cube, rotated into camera space once per
   // frame (rotation is linear, so this is the same for every voxel).
   const cs=scale*.9;
-  const axR=rotVec(.5,0,0,view.rotX,view.rotY).map(v=>v*cs);
-  const ayR=rotVec(0,.5,0,view.rotX,view.rotY).map(v=>v*cs);
-  const azR=rotVec(0,0,.5,view.rotX,view.rotY).map(v=>v*cs);
+  const axR=rotVec(.5,0,0,view.rotX,voxRotY).map(v=>v*cs);
+  const ayR=rotVec(0,.5,0,view.rotX,voxRotY).map(v=>v*cs);
+  const azR=rotVec(0,0,.5,view.rotX,voxRotY).map(v=>v*cs);
   // Of each pair of opposite faces, only the one turned toward the camera
   // is ever visible — pick it once per frame using each axis's rotated z.
   const signX=axR[2]>0?-1:1,signY=ayR[2]>0?-1:1,signZ=azR[2]>0?-1:1;
@@ -1844,7 +1851,7 @@ function renderFrame(ts){
   for(let x=0;x<gridW;x++)for(let z=0;z<gridD;z++){
     const h=Math.ceil(heights[x*gridD+z]);
     for(let y=0;y<h;y++){
-      const yt=y/gridH,rgb=getColor(yt,beatBoost*(1-yt)),rv=rotVec(x-cxg,y-cyg,z-czg,view.rotX,view.rotY);
+      const yt=y/gridH,rgb=getColor(yt,beatBoost*(1-yt)),rv=rotVec(x-cxg,y-cyg,z-czg,view.rotX,voxRotY);
       const cx3=rv[0]*cs,cy3=rv[1]*cs,cz3=rv[2]*cs;
       const[sx,sy]=proj(cx3,cy3,cz3,W,H);
       const fog=Math.max(.2,Math.min(1,1-rv[2]/(Math.max(gridW,gridD)*scale*1.2)));
@@ -1871,7 +1878,7 @@ function renderFrame(ts){
       voxels.push({sx,sy,depth:rv[2],rgb,fog,faces});
     }
     if(document.getElementById('show-floor').checked){
-      const rv=rotVec(x-cxg,-.5,z-czg,view.rotX,view.rotY);
+      const rv=rotVec(x-cxg,-.5,z-czg,view.rotX,voxRotY);
       const[sx,sy]=proj(rv[0]*scale*.9,rv[1]*scale*.9,rv[2]*scale*.9,W,H);
       voxels.push({sx,sy,depth:rv[2]+.001,isFloor:true});
     }
