@@ -1613,34 +1613,66 @@ function guessArtistTrack(rawTitle){
   if(m && m[1].trim() && m[2].trim()) return { artist: m[1].trim(), track: m[2].trim() };
   return { artist: '', track: t };
 }
+// Shared MusicBrainz rate limiter — waits until ~1.1s have passed since the
+// last request, no matter which function fired it. This matters because
+// lookupRecordingAlbum below can now issue more than one request per track
+// (a strict match, then looser fallbacks), so pacing has to live per-request
+// rather than per-track or MusicBrainz starts returning 503s.
+let _mbLastRequest = 0;
+async function mbFetchJson(url){
+  const wait = 1100 - (Date.now() - _mbLastRequest);
+  if(wait > 0) await sleep(wait);
+  _mbLastRequest = Date.now();
+  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  if(!res.ok) return null;
+  return res.json();
+}
+// Picks the best "album" release-group out of a MusicBrainz recording's
+// releases: prefers an official studio album over singles/live/compilations.
+function pickAlbumFromRecording(rec, fallbackArtist){
+  const releases = rec.releases || [];
+  let best = releases.find(rel => rel['release-group'] && rel['release-group']['primary-type'] === 'Album' && !(rel['release-group']['secondary-types'] || []).length);
+  if(!best) best = releases.find(rel => rel['release-group'] && rel['release-group']['primary-type'] === 'Album');
+  if(!best) return null;
+  const rg = best['release-group'];
+  const creditedArtist = rec['artist-credit'] && rec['artist-credit'][0] && rec['artist-credit'][0].name;
+  return { artist: creditedArtist || fallbackArtist || '', title: rg.title };
+}
 // Looks up which album (release-group) a single song belongs to, via
 // MusicBrainz's open, keyless recording search — no API key needed, same
-// source already used by lookupMusicBrainzRelease() above. Prefers an
-// official studio album over singles/live/compilation releases when a
-// recording has several. Fails silently (returns null) so one bad match
-// never blocks the rest of the playlist.
+// source already used by lookupMusicBrainzRelease() above.
+//
+// Tries progressively looser queries instead of giving up after one strict
+// attempt: a quoted exact-phrase match first (most precise, but fails on the
+// smallest formatting difference), then an unquoted tokenized match with the
+// artist, then title-only. Without this, a playlist where only one track's
+// YouTube title happens to line up exactly with MusicBrainz's phrasing would
+// match just that one song and silently fail on every other track — which
+// looks like "it only searched the first song" even though every track was
+// queried.
+// Fails silently overall (returns null) so one bad match never blocks the
+// rest of the playlist.
 async function lookupRecordingAlbum(artist, track){
   if(!track) return null;
-  try{
-    const q = artist
-      ? `recording:"${track.replace(/"/g,'')}" AND artist:"${artist.replace(/"/g,'')}"`
-      : `recording:"${track.replace(/"/g,'')}"`;
-    const url = `https://musicbrainz.org/ws/2/recording/?query=${encodeURIComponent(q)}&fmt=json&limit=5`;
-    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-    if(!res.ok) return null;
-    const recs = (await res.json()).recordings || [];
-    for(const rec of recs){
-      const releases = rec.releases || [];
-      let best = releases.find(rel => rel['release-group'] && rel['release-group']['primary-type'] === 'Album' && !(rel['release-group']['secondary-types'] || []).length);
-      if(!best) best = releases.find(rel => rel['release-group'] && rel['release-group']['primary-type'] === 'Album');
-      if(best){
-        const rg = best['release-group'];
-        const creditedArtist = rec['artist-credit'] && rec['artist-credit'][0] && rec['artist-credit'][0].name;
-        return { artist: creditedArtist || artist || '', title: rg.title };
+  const t = String(track).replace(/"/g, '').trim();
+  const a = String(artist || '').replace(/"/g, '').trim();
+  const queries = [];
+  if(a) queries.push(`recording:"${t}" AND artist:"${a}"`); // exact phrase, most precise
+  if(a) queries.push(`recording:${t} AND artist:${a}`);      // tokenized/fuzzy fallback
+  queries.push(`recording:${t}`);                             // last resort: title only
+
+  for(const q of queries){
+    try{
+      const url = `https://musicbrainz.org/ws/2/recording/?query=${encodeURIComponent(q)}&fmt=json&limit=8`;
+      const data = await mbFetchJson(url);
+      const recs = (data && data.recordings) || [];
+      for(const rec of recs){
+        const found = pickAlbumFromRecording(rec, artist);
+        if(found) return found;
       }
-    }
-    return null;
-  }catch(e){ return null; }
+    }catch(e){ /* try the next, looser query */ }
+  }
+  return null;
 }
 let plImportBusy = false;
 let plImportTracks = []; // last-fetched playlist's tracks: [{videoId,title,position,duration_ms}], used by Save Playlist below
@@ -1682,7 +1714,9 @@ async function doPlaylistAlbumImport(){
         albumsMap.get(key).count++;
       }
       setProgress(Math.round(((i + 1) / tracks.length) * 100));
-      if(i < tracks.length - 1) await sleep(1100); // stay under MusicBrainz's ~1 request/sec limit
+      // no manual sleep here — mbFetchJson() paces every MusicBrainz request
+      // globally now, since a single track can fire off 1-3 requests (exact
+      // match + fallbacks) rather than exactly one.
     }
     const albums = Array.from(albumsMap.values()).sort((a, b) => b.count - a.count);
     document.getElementById('pl-save-area').style.display = 'block';
