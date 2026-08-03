@@ -950,7 +950,17 @@ document.getElementById('progress-wrap').addEventListener('click',e=>{
   const r=e.currentTarget.getBoundingClientRect();
   const frac=(e.clientX-r.left)/r.width;
   if(activeEngine==='yt'&&ytPlayer&&ytReady){
-    try{ const dur=ytPlayer.getDuration(); if(isFinite(dur)&&dur>0)ytPlayer.seekTo(frac*dur,true); }catch(e){}
+    try{
+      const dur=ytPlayer.getDuration();
+      if(isFinite(dur)&&dur>0){
+        ytPlayer.seekTo(frac*dur,true);
+        // seekTo() doesn't reliably resume playback on its own in the embedded
+        // iframe player — without this it can silently stall in a paused or
+        // buffering state until something else (like loadVideoById via
+        // prev/next) forces it to restart.
+        ytPlayer.playVideo();
+      }
+    }catch(e){}
   } else if(audio.duration){
     audio.currentTime=frac*audio.duration;
   }
@@ -1628,22 +1638,60 @@ async function mbFetchJson(url){
   if(!res.ok) return null;
   return res.json();
 }
-// Picks the best "album" release-group out of a MusicBrainz recording's
-// releases: prefers an official studio album over singles/live/compilations.
+// Picks the best release-group out of a MusicBrainz recording's releases:
+// prefers an official studio album, but falls back to a Single release-group
+// when that's all the recording has (rather than being treated the same as
+// "no match at all" and silently dropped).
 function pickAlbumFromRecording(rec, fallbackArtist){
   const releases = rec.releases || [];
   let best = releases.find(rel => rel['release-group'] && rel['release-group']['primary-type'] === 'Album' && !(rel['release-group']['secondary-types'] || []).length);
   if(!best) best = releases.find(rel => rel['release-group'] && rel['release-group']['primary-type'] === 'Album');
-  if(!best) return null;
-  const rg = best['release-group'];
-  const creditedArtist = rec['artist-credit'] && rec['artist-credit'][0] && rec['artist-credit'][0].name;
-  return { artist: creditedArtist || fallbackArtist || '', title: rg.title, rgid: rg.id || null };
+  if(best){
+    const rg = best['release-group'];
+    const creditedArtist = rec['artist-credit'] && rec['artist-credit'][0] && rec['artist-credit'][0].name;
+    return { type: 'album', artist: creditedArtist || fallbackArtist || '', title: rg.title, rgid: rg.id || null };
+  }
+  const single = releases.find(rel => rel['release-group'] && rel['release-group']['primary-type'] === 'Single');
+  if(single){
+    const rg = single['release-group'];
+    const creditedArtist = rec['artist-credit'] && rec['artist-credit'][0] && rec['artist-credit'][0].name;
+    return { type: 'single', artist: creditedArtist || fallbackArtist || '', title: rg.title || rec.title, rgid: rg.id || null };
+  }
+  return null;
 }
 // Cover Art Archive image URL for a MusicBrainz release-group. There's no
 // key/quota to worry about, but not every release-group has art uploaded —
-// the <img> just needs an onerror fallback wherever this is used.
+// the <img> just needs a fallback wherever this is used (see
+// handleCoverArtError below).
 function coverArtUrlForReleaseGroup(rgid){
   return rgid ? `https://coverartarchive.org/release-group/${rgid}/front-250` : '';
+}
+// Fallback artwork source for when Cover Art Archive has nothing for a
+// release-group (common for smaller/obscure releases). iTunes' catalog has
+// much broader art coverage and needs no API key either, so this is tried
+// before giving up to the empty placeholder box.
+async function itunesArtworkUrl(artist, title){
+  try{
+    const term = [artist, title].filter(Boolean).join(' ');
+    if(!term) return null;
+    const url = `https://itunes.apple.com/search?entity=album&limit=1&term=${encodeURIComponent(term)}`;
+    const res = await fetch(url);
+    if(!res.ok) return null;
+    const data = await res.json();
+    const hit = (data.results || [])[0];
+    if(!hit || !hit.artworkUrl100) return null;
+    return hit.artworkUrl100.replace('100x100bb', '250x250bb'); // request a bigger size
+  }catch(e){ return null; }
+}
+// Wired to each cover-art <img>'s onerror. Tries the iTunes fallback once;
+// if that also comes up empty, swaps the <img> for the plain placeholder box
+// so a broken-image icon never shows.
+async function handleCoverArtError(imgEl){
+  if(imgEl.dataset.fallbackTried){ imgEl.outerHTML = '<div class="sr-noart"></div>'; return; }
+  imgEl.dataset.fallbackTried = '1';
+  const url = await itunesArtworkUrl(imgEl.dataset.artist, imgEl.dataset.title);
+  if(url) imgEl.src = url;
+  else imgEl.outerHTML = '<div class="sr-noart"></div>';
 }
 // Looks up which album (release-group) a single song belongs to, via
 // MusicBrainz's open, keyless recording search — no API key needed, same
@@ -1711,16 +1759,34 @@ async function doPlaylistAlbumImport(){
     if(!tracks.length){ statusEl.textContent = 'could not load that playlist — check the link and try again.'; return; }
     plImportTracks = tracks;
     const albumsMap = new Map(); // "artist||title" (lowercase) -> {artist,title,rgid,songs:[]}
+    const singles = []; // [{artist,title,rgid,videoId,duration_ms,rawTitle}] — one entry per single track
+    let dupSkipped = 0;
     for(let i=0; i<tracks.length; i++){
       statusEl.textContent = `looking up albums… (${i+1}/${tracks.length})`;
+      // Already have this exact song under some other album in the library?
+      // Skip it entirely rather than offer it again as part of an album match
+      // or as a new single — that's how the same song ends up duplicated
+      // across two different library entries.
+      if(findLibTrackForTitle(tracks[i].title)){
+        dupSkipped++;
+        setProgress(Math.round(((i + 1) / tracks.length) * 100));
+        continue;
+      }
       const { artist, track } = guessArtistTrack(tracks[i].title);
       const found = await lookupRecordingAlbum(artist, track);
       if(found && found.title){
-        const key = (found.artist || '').toLowerCase() + '||' + found.title.toLowerCase();
-        if(!albumsMap.has(key)) albumsMap.set(key, { artist: found.artist, title: found.title, rgid: found.rgid, songs: [] });
-        const entry = albumsMap.get(key);
-        entry.songs.push(tracks[i].title); // keep the raw playlist title so it's recognizable
-        if(!entry.rgid && found.rgid) entry.rgid = found.rgid;
+        if(found.type === 'single'){
+          singles.push({
+            artist: found.artist, title: found.title, rgid: found.rgid,
+            videoId: tracks[i].videoId, duration_ms: tracks[i].duration_ms, rawTitle: tracks[i].title
+          });
+        }else{
+          const key = (found.artist || '').toLowerCase() + '||' + found.title.toLowerCase();
+          if(!albumsMap.has(key)) albumsMap.set(key, { artist: found.artist, title: found.title, rgid: found.rgid, songs: [] });
+          const entry = albumsMap.get(key);
+          entry.songs.push(tracks[i].title); // keep the raw playlist title so it's recognizable
+          if(!entry.rgid && found.rgid) entry.rgid = found.rgid;
+        }
       }
       setProgress(Math.round(((i + 1) / tracks.length) * 100));
       // no manual sleep here — mbFetchJson() paces every MusicBrainz request
@@ -1729,8 +1795,14 @@ async function doPlaylistAlbumImport(){
     }
     const albums = Array.from(albumsMap.values()).sort((a, b) => b.songs.length - a.songs.length);
     document.getElementById('pl-save-area').style.display = 'block';
-    if(!albums.length){ statusEl.textContent = `matched 0 albums from ${tracks.length} tracks — try Add Album search instead.`; return; }
-    statusEl.textContent = `found ${albums.length} album(s) across ${tracks.length} tracks — pick which to add:`;
+    if(!albums.length && !singles.length){
+      statusEl.textContent = dupSkipped
+        ? `matched 0 new albums or singles — ${dupSkipped} track(s) were already in your library.`
+        : `matched 0 albums from ${tracks.length} tracks — try Add Album search instead.`;
+      return;
+    }
+    const dupNote = dupSkipped ? ` (${dupSkipped} already in your library, skipped)` : '';
+    statusEl.textContent = `found ${albums.length} album(s) and ${singles.length} single(s) across ${tracks.length} tracks${dupNote} — pick which to add:`;
     // Show up to 2 of the matched playlist song titles per album (so you can
     // recognize *why* it matched), with a "+N more" tail for the rest.
     const songsLabel = songs => {
@@ -1738,20 +1810,34 @@ async function doPlaylistAlbumImport(){
       const rest = songs.length - 2;
       return rest > 0 ? `${shown} +${rest} more` : shown;
     };
-    resultsEl.innerHTML = albums.map((a, i) => `
-      <div class="sr-item" data-index="${i}">
+    const albumItemsHtml = albums.map((a, i) => `
+      <div class="sr-item" data-kind="album" data-index="${i}">
         ${a.rgid
-          ? `<img src="${escAttr(coverArtUrlForReleaseGroup(a.rgid))}" onerror="this.outerHTML='<div class=&quot;sr-noart&quot;></div>'">`
-          : `<div class="sr-noart"></div>`}
+          ? `<img src="${escAttr(coverArtUrlForReleaseGroup(a.rgid))}" data-artist="${escAttr(a.artist)}" data-title="${escAttr(a.title)}" onerror="handleCoverArtError(this)">`
+          : `<img src="data:," data-artist="${escAttr(a.artist)}" data-title="${escAttr(a.title)}" onerror="handleCoverArtError(this)">`}
         <div class="sr-meta">
           <div class="sr-title">${esc(a.title)} <span style="opacity:.6">— ${esc(a.artist || 'unknown artist')}</span></div>
           <div class="sr-sub">${songsLabel(a.songs)}</div>
         </div>
         <button class="sr-add" data-action="add">ADD</button>
       </div>`).join('');
-    resultsEl.querySelectorAll('.sr-item').forEach(item => {
+    const singleItemsHtml = singles.map((s, i) => `
+      <div class="sr-item" data-kind="single" data-index="${i}">
+        <img src="https://i.ytimg.com/vi/${escAttr(s.videoId)}/hqdefault.jpg" data-artist="${escAttr(s.artist)}" data-title="${escAttr(s.title)}" onerror="handleCoverArtError(this)">
+        <div class="sr-meta">
+          <div class="sr-title">${esc(s.title)} <span style="opacity:.6">— ${esc(s.artist || 'unknown artist')}</span> <span style="opacity:.5">(single)</span></div>
+          <div class="sr-sub">${esc(s.rawTitle)}</div>
+        </div>
+        <button class="sr-add" data-action="add">ADD</button>
+      </div>`).join('');
+    resultsEl.innerHTML = albumItemsHtml + singleItemsHtml;
+    resultsEl.querySelectorAll('.sr-item[data-kind="album"]').forEach(item => {
       const a = albums[Number(item.dataset.index)];
       item.querySelector('.sr-add').addEventListener('click', () => importAlbumByName(a.artist, a.title, item.querySelector('.sr-add')));
+    });
+    resultsEl.querySelectorAll('.sr-item[data-kind="single"]').forEach(item => {
+      const s = singles[Number(item.dataset.index)];
+      item.querySelector('.sr-add').addEventListener('click', () => importSingleTrack(s, item.querySelector('.sr-add')));
     });
   }catch(e){
     console.error(e);
@@ -1777,6 +1863,45 @@ async function importAlbumByName(artist, title, btnEl){
     await importLibAlbum(results[0], btnEl, statusEl);
   }catch(e){
     console.error(e);
+    if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'ADD'; }
+  }
+}
+// Imports a MusicBrainz-confirmed single straight from the video already
+// pulled off the pasted playlist — unlike importAlbumByName, this doesn't
+// need a fresh YouTube search, since we already know the exact videoId,
+// title, and duration for this one song. Saved as a normal library album
+// with a single track, so it lists and plays alongside full albums
+// everywhere else in the app. A synthetic "single:<videoId>" is used in
+// place of a real playlist id (there isn't one for a lone track) purely so
+// the existing "already in library" dedup check keeps working.
+async function importSingleTrack(single, btnEl){
+  const statusEl = document.getElementById('pl-import-status');
+  if(!libCurrentUser){ statusEl.textContent = 'sign in first (Account tab) to add singles to the library.'; return; }
+  const syntheticPlaylistId = `single:${single.videoId}`;
+  if(libAlbums.some(a => a.youtube_playlist_id === syntheticPlaylistId)){
+    if(btnEl){ btnEl.textContent = 'ALREADY IN LIBRARY'; btnEl.disabled = true; }
+    return;
+  }
+  if(btnEl){ btnEl.disabled = true; btnEl.textContent = '...'; }
+  try{
+    const albumRow = {
+      youtube_playlist_id: syntheticPlaylistId, title: single.title, artist: single.artist,
+      artwork_url: `https://i.ytimg.com/vi/${single.videoId}/hqdefault.jpg`,
+      track_count: 1, added_by: libCurrentUser.id, release_date: null
+    };
+    const { data: inserted, error } = await sb.from('albums').insert(albumRow).select().single();
+    if(error){ console.error(error); statusEl.textContent = 'could not save single — check console.'; if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'ADD'; } return; }
+    const { error: trackErr } = await sb.from('tracks').insert([{
+      album_id: inserted.id, youtube_video_id: single.videoId, track_number: 1,
+      title: single.rawTitle, duration_ms: single.duration_ms
+    }]);
+    if(trackErr) console.error(trackErr);
+    statusEl.textContent = `added "${single.title}" as a single.`;
+    if(btnEl) btnEl.textContent = 'ADDED ✓';
+    await loadLibAlbums();
+  }catch(e){
+    console.error(e);
+    statusEl.textContent = 'import failed — check console.';
     if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'ADD'; }
   }
 }
@@ -2409,7 +2534,8 @@ function onModelLoaded(obj,fname){
     const geo=c.geometry;
     if(!geo.attributes.normal)geo.computeVertexNormals();
     geo.userData.orig=new Float32Array(geo.attributes.position.array);
-    c.material=new THREE.MeshPhongMaterial({color:0xaaff44,emissive:0x112200,shininess:80,side:THREE.DoubleSide,transparent:true,opacity:+document.getElementById('model-opacity').value});
+    const opacity=+document.getElementById('model-opacity').value;
+    c.material=new THREE.MeshPhongMaterial({color:0xaaff44,emissive:0x112200,shininess:80,side:THREE.DoubleSide,transparent:opacity<1,opacity});
     modelMeshes.push(c);
   });
   if(!modelMeshes.length){alert('No meshes found in model.');modelRig.remove(modelRoot);modelRoot=null;return;}
@@ -2616,7 +2742,15 @@ function removeModel(){
 }
 
 function updateWire(){const w=document.getElementById('model-wire').checked;modelMeshes.forEach(m=>{if(m.material)m.material.wireframe=w;});}
-function updateOpacity(v){document.getElementById('val-mopacity').textContent=(+v).toFixed(1);modelMeshes.forEach(m=>{if(m.material)m.material.opacity=+v;});}
+function updateOpacity(v){
+  document.getElementById('val-mopacity').textContent=(+v).toFixed(1);
+  const opacity=+v, transparent=opacity<1;
+  modelMeshes.forEach(m=>{
+    if(!m.material)return;
+    m.material.opacity=opacity;
+    if(m.material.transparent!==transparent){ m.material.transparent=transparent; m.material.needsUpdate=true; }
+  });
+}
 function toggleModelVis(){
   const show=document.getElementById('show-model').checked;
   document.getElementById('three-canvas').style.display=(show&&modelRoot)?'block':'none';
