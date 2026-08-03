@@ -1920,10 +1920,25 @@ function normalizeTrackTitle(s){
 function findLibTrackForTitle(rawTitle){
   const norm = normalizeTrackTitle(rawTitle);
   if(!norm) return null;
+  // Playlist entries are usually "Artist - Track" — pull the artist out so we
+  // don't match a track title against some other artist's song of the same
+  // (or similar) name. Without this check, short/common titles (e.g. "Fade")
+  // were matching across completely unrelated artists.
+  const guessedArtist = guessArtistTrack(rawTitle).artist;
+  const normArtist = guessedArtist.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   for(const album of libAlbums){
+    const albumArtistNorm = (album.artist || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    // If we could guess an artist from the playlist title, require it to
+    // roughly match the album's artist before even looking at track titles.
+    if(normArtist && albumArtistNorm &&
+       normArtist !== albumArtistNorm &&
+       !albumArtistNorm.includes(normArtist) &&
+       !normArtist.includes(albumArtistNorm)) continue;
     for(const t of (album.tracks || [])){
       const tn = normalizeTrackTitle(t.title);
-      if(tn && (tn === norm || tn.includes(norm) || norm.includes(tn))) return t;
+      // Exact match only now — the old substring check ("tn.includes(norm)")
+      // meant a title like "Fade" would match "Fade Into You" and vice versa.
+      if(tn && tn === norm) return t;
     }
   }
   return null;
